@@ -23,6 +23,8 @@ dist-ssr
 
 # env
 .env
+.env.example
+
 
 # vite build stats
 stats.html
