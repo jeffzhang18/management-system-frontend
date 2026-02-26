@@ -9,6 +9,8 @@ interface ImportMetaEnv {
 	readonly VITE_APP_API_BASE_URL: string;
 	/** Routing mode: frontend routing or backend routing */
 	readonly VITE_APP_ROUTER_MODE: "frontend" | "backend";
+
+	readonly VITE_DEV_PROXY_TARGET: string;
 }
 
 interface ImportMeta {

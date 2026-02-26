@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import avatar1 from "@/assets/images/avatars/avatar-1.png";
 import avatar2 from "@/assets/images/avatars/avatar-2.png";
 import avatar3 from "@/assets/images/avatars/avatar-3.png";
@@ -12,7 +13,6 @@ import { Card, CardContent } from "@/ui/card";
 import { Progress } from "@/ui/progress";
 import { Text, Title } from "@/ui/typography";
 import { rgbAlpha } from "@/utils/theme";
-import { useState } from "react";
 import BannerCard from "./banner-card";
 
 const quickStats = [
@@ -35,7 +35,7 @@ const quickStats = [
 	{
 		icon: "solar:checklist-outline",
 		label: "Total Task",
-		value: "839",
+		value: "840",
 		percent: 0,
 		color: "#10b981",
 		chart: [10, 14, 12, 16, 18, 14, 12, 10, 14, 18, 16, 12],
@@ -54,7 +54,7 @@ const monthlyRevenue = {
 	series: [
 		{
 			name: "Revenue",
-			data: [30, 40, 35, 50, 49, 70, 91, 60, 50, 55, 60, 65],
+			data: [10, 40, 35, 50, 49, 70, 91, 60, 50, 55, 60, 65],
 		},
 	],
 	categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
@@ -111,6 +111,33 @@ export default function Workbench() {
 		plotOptions: { pie: { donut: { size: "70%" } } },
 	});
 
+	const quickStatBaseOptions = useChart({
+		chart: { sparkline: { enabled: true } },
+		grid: { show: false },
+		yaxis: { show: false },
+		tooltip: { enabled: false },
+	});
+
+	const quickStatOptionsByLabel = useMemo(() => {
+		return Object.fromEntries(
+			quickStats.map((stat) => [
+				stat.label,
+				{
+					...quickStatBaseOptions,
+					colors: [stat.color],
+				},
+			]),
+		);
+	}, [quickStatBaseOptions]);
+
+	const overviewSparkOptions = useChart({
+		chart: { sparkline: { enabled: true } },
+		colors: ["#ef4444"],
+		grid: { show: false },
+		yaxis: { show: false },
+		tooltip: { enabled: false },
+	});
+
 	// throw new Error("test error"); // 注释掉直接抛错，改用演示组件
 
 	return (
@@ -148,13 +175,7 @@ export default function Workbench() {
 								<Chart
 									type="bar"
 									height={40}
-									options={useChart({
-										chart: { sparkline: { enabled: true } },
-										colors: [stat.color],
-										grid: { show: false },
-										yaxis: { show: false },
-										tooltip: { enabled: false },
-									})}
+									options={quickStatOptionsByLabel[stat.label]}
 									series={[{ data: stat.chart }]}
 								/>
 							</div>
@@ -231,13 +252,7 @@ export default function Workbench() {
 						<Chart
 							type="line"
 							height={60}
-							options={useChart({
-								chart: { sparkline: { enabled: true } },
-								colors: ["#ef4444"],
-								grid: { show: false },
-								yaxis: { show: false },
-								tooltip: { enabled: false },
-							})}
+							options={overviewSparkOptions}
 							series={[{ data: [10, 20, 15, 30, 25, 40, 35, 20] }]}
 						/>
 					</div>

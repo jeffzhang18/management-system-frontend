@@ -16,6 +16,11 @@ export const frontendNavData: NavProps["data"] = [
 				path: "/analysis",
 				icon: <Icon icon="local:ic-analysis" size="24" />,
 			},
+			{
+				title: "sys.nav.weather",
+				path: "/weather",
+				icon: <Icon icon="local:ic-weather" size="24" />,
+			},
 		],
 	},
 	{
