@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { DB_USER } from "@/_mock/assets_backup";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { useAuthCheck } from "@/components/auth/use-auth";
@@ -7,7 +8,6 @@ import { Button } from "@/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
 import { Text } from "@/ui/typography";
-import { Link } from "react-router";
 
 const Component_Auth_1 = `
 <AuthGuard
@@ -89,7 +89,7 @@ export default function PermissionPage() {
 		if (_username === username) return;
 		const user = DB_USER.find((user) => user.username === _username);
 		if (user) {
-			signIn({ username: user.username, password: user.password });
+			signIn({ userName: user.username, password: user.password });
 		}
 	};
 	return (

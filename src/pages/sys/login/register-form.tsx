@@ -1,10 +1,11 @@
+import { useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import type { SignUpReq } from "@/api/services/userService";
 import userService from "@/api/services/userService";
 import { Button } from "@/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/ui/form";
 import { Input } from "@/ui/input";
-import { useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { useTranslation } from "react-i18next";
 import { ReturnButton } from "./components/ReturnButton";
 import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider";
 
@@ -27,7 +28,13 @@ function RegisterForm() {
 
 	const onFinish = async (values: any) => {
 		console.log("Received values of form: ", values);
-		await signUpMutation.mutateAsync(values);
+		const signUpReq: SignUpReq = {
+			email: values.email,
+			userName: values.username,
+			password: values.password,
+		};
+
+		await signUpMutation.mutateAsync(signUpReq);
 		backToLogin();
 	};
 
