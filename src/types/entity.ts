@@ -10,7 +10,7 @@ export interface UserInfo {
 	id: string;
 	email: string;
 	username: string;
-	password?: string;
+	// password?: string;
 	avatar?: string;
 	roles?: Role[];
 	status?: BasicStatus;

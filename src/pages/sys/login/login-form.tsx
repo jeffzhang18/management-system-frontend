@@ -58,13 +58,13 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 
 					<FormField
 						control={form.control}
-						name="userName"
-						rules={{ required: t("sys.login.accountPlaceholder") }}
+						name="email"
+						rules={{ required: t("sys.login.emaildPlaceholder") }}
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel>{t("sys.login.userName")}</FormLabel>
+								<FormLabel>{t("sys.login.email")}</FormLabel>
 								<FormControl>
-									<Input placeholder={DB_USER.map((user) => user.username).join("/")} {...field} />
+									<Input placeholder={DB_USER.map((user) => user.email).join("")} {...field} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>

@@ -2,12 +2,12 @@ import type { UserInfo, UserToken } from "#/entity";
 import apiClient from "../apiClient";
 
 export interface SignInReq {
-	userName: string;
+	email: string;
 	password: string;
 }
 
 export interface SignUpReq extends SignInReq {
-	email: string;
+	userName: string;
 }
 
 export type SignInRes = UserToken & { user: UserInfo };

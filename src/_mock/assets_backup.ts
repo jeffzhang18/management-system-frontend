@@ -424,20 +424,20 @@ export const DB_USER: User[] = [
 		avatar: faker.image.avatarGitHub(),
 		email: "admin@slash.com",
 	},
-	{
-		id: "user_test_id",
-		username: "test",
-		password: "demo1234",
-		avatar: faker.image.avatarGitHub(),
-		email: "test@slash.com",
-	},
-	{
-		id: "user_guest_id",
-		username: "guest",
-		password: "demo1234",
-		avatar: faker.image.avatarGitHub(),
-		email: "guest@slash.com",
-	},
+	// {
+	// 	id: "user_test_id",
+	// 	username: "test",
+	// 	password: "demo1234",
+	// 	avatar: faker.image.avatarGitHub(),
+	// 	email: "test@slash.com",
+	// },
+	// {
+	// 	id: "user_guest_id",
+	// 	username: "guest",
+	// 	password: "demo1234",
+	// 	avatar: faker.image.avatarGitHub(),
+	// 	email: "guest@slash.com",
+	// },
 ];
 
 export const DB_ROLE: Role[] = [

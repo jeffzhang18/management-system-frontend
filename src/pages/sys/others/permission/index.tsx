@@ -89,7 +89,7 @@ export default function PermissionPage() {
 		if (_username === username) return;
 		const user = DB_USER.find((user) => user.username === _username);
 		if (user) {
-			signIn({ userName: user.username, password: user.password });
+			signIn({ email: user.email, password: user.password });
 		}
 	};
 	return (
