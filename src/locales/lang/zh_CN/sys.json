@@ -168,6 +168,9 @@
 			"accordion": "手风琴菜单",
 			"fullscreen": "全屏",
 			"exitFullscreen": "退出全屏"
+		},
+		"weather": {
+			"whichCityPlaceHolder": "请输入城市~"
 		}
 	}
 }

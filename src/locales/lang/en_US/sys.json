@@ -162,6 +162,9 @@
 			"closeRight": "Close Right",
 			"fullscreen": "FullScreen",
 			"refresh": "Refresh"
+		},
+		"weather": {
+			"whichCityPlaceHolder": "Please input the city"
 		}
 	}
 }
