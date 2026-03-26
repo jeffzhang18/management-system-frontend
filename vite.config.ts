@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
 			port: 3001,
 			proxy: {
 				"/api": {
-					target: "http://localhost:3000",
+					target: env.VITE_DEV_PROXY_TARGET || "http://47.117.245.39:3000",
 					changeOrigin: true,
 					rewrite: (path) => path.replace(/^\/api/, ""),
 					secure: false,

@@ -16,6 +16,8 @@ export type GlobalConfig = {
 	apiBaseUrl: string;
 	/** Routing mode: frontend routing or backend routing */
 	routerMode: "frontend" | "backend";
+	/** Whether to enable mock service worker */
+	enableMock: boolean;
 };
 
 /**
@@ -32,4 +34,5 @@ export const GLOBAL_CONFIG: GlobalConfig = {
 	publicPath: import.meta.env.VITE_APP_PUBLIC_PATH || "/",
 	apiBaseUrl: import.meta.env.VITE_APP_API_BASE_URL || "/api",
 	routerMode: import.meta.env.VITE_APP_ROUTER_MODE || "frontend",
+	enableMock: import.meta.env.VITE_APP_ENABLE_MOCK === "true",
 };

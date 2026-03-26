@@ -2,9 +2,9 @@ import "./global.css";
 import "./theme/theme.css";
 import "./locales/i18n";
 import ReactDOM from "react-dom/client";
-import { Outlet, RouterProvider, createBrowserRouter } from "react-router";
-import App from "./App";
+import { createBrowserRouter, Outlet, RouterProvider } from "react-router";
 import { worker } from "./_mock";
+import App from "./App";
 import menuService from "./api/services/menuService";
 import { registerLocalIcons } from "./components/icon";
 import { GLOBAL_CONFIG } from "./global-config";
@@ -13,10 +13,21 @@ import { routesSection } from "./routes/sections";
 import { urlJoin } from "./utils";
 
 await registerLocalIcons();
-await worker.start({
-	onUnhandledRequest: "bypass",
-	serviceWorker: { url: urlJoin(GLOBAL_CONFIG.publicPath, "mockServiceWorker.js") },
-});
+
+if (GLOBAL_CONFIG.enableMock) {
+	await worker.start({
+		onUnhandledRequest: "bypass",
+		serviceWorker: { url: urlJoin(GLOBAL_CONFIG.publicPath, "mockServiceWorker.js") },
+	});
+} else if ("serviceWorker" in navigator) {
+	const registrations = await navigator.serviceWorker.getRegistrations();
+	await Promise.all(
+		registrations
+			.filter((registration) => registration.active?.scriptURL.includes("mockServiceWorker.js"))
+			.map((registration) => registration.unregister()),
+	);
+}
+
 if (GLOBAL_CONFIG.routerMode === "backend") {
 	await menuService.getMenuList();
 }

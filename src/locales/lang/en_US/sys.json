@@ -164,7 +164,23 @@
 			"refresh": "Refresh"
 		},
 		"weather": {
-			"whichCityPlaceHolder": "Please input the city"
+			"whichCityPlaceHolder": "Please input the city",
+			"noMatchedCity": "No matching city",
+			"pageDescription": "Search and select cities to pin them as draggable weather cards.",
+			"noCitySelected": "No city selected yet",
+			"emptyCardHint": "Select a city and the matching weather card will appear here.",
+			"feelsLike": "Feels Like",
+			"humidity": "Humidity",
+			"windSpeed": "Wind Speed",
+			"pressure": "Pressure",
+			"windDirection": "Wind Direction",
+			"liveWeather": "Live Weather",
+			"currentWeatherInfo": "Current weather details are shown here.",
+			"loadFailed": "Failed to load weather",
+			"dragCity": "Drag {{city}}",
+			"removeCity": "Remove {{city}}",
+			"dragCard": "Drag weather card for {{city}}",
+			"noData": "No data"
 		}
 	}
 }

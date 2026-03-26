@@ -1,20 +1,33 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { LocationInfo, SearchLocationReq } from "@/api/services/weatherService";
 import weatherService from "@/api/services/weatherService";
 
 import { Input } from "@/ui/input";
 
-const SearchBox = () => {
+interface SearchBoxProps {
+	onSelectLocation?: (location: LocationInfo) => void;
+}
+
+const SearchBox = ({ onSelectLocation }: SearchBoxProps) => {
+	const { t, i18n } = useTranslation();
 	const [inputValue, setInputValue] = useState<string>("");
 	const [open, setOpen] = useState<boolean>(false);
 	const [locations, setLocations] = useState<LocationInfo[]>([]);
-	const [_choosedLocation, setChoosedLocation] = useState<string>("");
-	const [_choosedLocationId, setChoosedLocationId] = useState<string>("");
 
 	const handleSearch = async (searchLocationReq: SearchLocationReq) => {
+		if (!searchLocationReq.locationName.trim()) {
+			setLocations([]);
+			setOpen(false);
+			return;
+		}
+
 		setLocations([]);
 		try {
-			const res = await weatherService.searchLocation(searchLocationReq);
+			const res = await weatherService.searchLocation({
+				...searchLocationReq,
+				lang: i18n.resolvedLanguage || i18n.language,
+			});
 			setLocations(res.location);
 		} catch (e) {
 			console.log(e);
@@ -27,7 +40,7 @@ const SearchBox = () => {
 		<div className="relative w-[300px]">
 			<Input
 				value={inputValue}
-				placeholder="请输入城市"
+				placeholder={t("sys.weather.whichCityPlaceHolder")}
 				onChange={(e) => {
 					setInputValue(e.target.value);
 				}}
@@ -50,18 +63,17 @@ const SearchBox = () => {
 								type="button"
 								className="block w-full px-3 py-2 text-left text-sm hover:bg-accent"
 								onMouseDown={() => {
-									setInputValue(`${location.name}`);
-									setChoosedLocation(location.name);
-									setChoosedLocationId(location.id);
+									onSelectLocation?.(location);
 									setOpen(false);
-									setInputValue(`${location.country}, ${location.adm1}, ${location.name}`);
+									setLocations([]);
+									setInputValue("");
 								}}
 							>
 								{location.country}, {location.adm1}, {location.name}
 							</button>
 						))
 					) : (
-						<div className="px-3 py-2 text-sm text-muted-foreground">没有匹配的城市</div>
+						<div className="px-3 py-2 text-sm text-muted-foreground">{t("sys.weather.noMatchedCity")}</div>
 					)}
 				</div>
 			)}

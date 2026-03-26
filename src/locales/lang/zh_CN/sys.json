@@ -170,7 +170,23 @@
 			"exitFullscreen": "退出全屏"
 		},
 		"weather": {
-			"whichCityPlaceHolder": "请输入城市~"
+			"whichCityPlaceHolder": "请输入城市~",
+			"noMatchedCity": "没有匹配的城市",
+			"pageDescription": "搜索并选择城市后，可将城市固定为可拖拽排序的天气卡片。",
+			"noCitySelected": "暂未选择城市",
+			"emptyCardHint": "选择城市后，这里会显示对应的天气卡片。",
+			"feelsLike": "体感温度",
+			"humidity": "湿度",
+			"windSpeed": "风速",
+			"pressure": "气压",
+			"windDirection": "风向",
+			"liveWeather": "实时天气",
+			"currentWeatherInfo": "已为你展示当前天气信息",
+			"loadFailed": "天气加载失败",
+			"dragCity": "拖动{{city}}",
+			"removeCity": "删除{{city}}",
+			"dragCard": "拖动{{city}}天气卡片",
+			"noData": "暂无"
 		}
 	}
 }
