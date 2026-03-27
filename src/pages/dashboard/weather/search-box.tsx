@@ -10,7 +10,7 @@ interface SearchBoxProps {
 }
 
 const SearchBox = ({ onSelectLocation }: SearchBoxProps) => {
-	const { t, i18n } = useTranslation();
+	const { t } = useTranslation();
 	const [inputValue, setInputValue] = useState<string>("");
 	const [open, setOpen] = useState<boolean>(false);
 	const [locations, setLocations] = useState<LocationInfo[]>([]);
@@ -24,13 +24,10 @@ const SearchBox = ({ onSelectLocation }: SearchBoxProps) => {
 
 		setLocations([]);
 		try {
-			const res = await weatherService.searchLocation({
-				...searchLocationReq,
-				lang: i18n.resolvedLanguage || i18n.language,
-			});
+			const res = await weatherService.searchLocation(searchLocationReq);
 			setLocations(res.location);
-		} catch (e) {
-			console.log(e);
+		} catch {
+			setLocations([]);
 		} finally {
 			setOpen(true);
 		}

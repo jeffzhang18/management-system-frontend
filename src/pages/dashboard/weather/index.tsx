@@ -2,14 +2,16 @@ import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor,
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { TFunction } from "i18next";
-import { GripVerticalIcon, XIcon } from "lucide-react";
-import { type CSSProperties, useCallback, useMemo, useState } from "react";
+import { GripVerticalIcon, RotateCwIcon, XIcon } from "lucide-react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LocalEnum } from "#/enum";
-import type { LocationInfo, WeatherNowInfo } from "@/api/services/weatherService";
+import { LocalEnum, StorageEnum } from "#/enum";
+import type { LocationInfo, SavedLocationItem, WeatherNowInfo } from "@/api/services/weatherService";
 import weatherService from "@/api/services/weatherService";
 import { themeVars } from "@/theme/theme.css";
+import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { getStringItem } from "@/utils/storage";
 import { rgbAlpha } from "@/utils/theme";
 import SearchBox from "./search-box";
 
@@ -120,6 +122,10 @@ function getLocaleTag(language: string) {
 	return language === LocalEnum.zh_CN ? "zh-CN" : "en-US";
 }
 
+function getWeatherApiLang(language: string) {
+	return language === LocalEnum.zh_CN ? "zh" : "en";
+}
+
 function formatObservationTime(obsTime: string | undefined, language: string) {
 	if (!obsTime) return "--";
 
@@ -144,13 +150,51 @@ function getWeatherMeta(t: TFunction) {
 	] as const;
 }
 
+function normalizeSavedLocationIds(payload: unknown): string[] {
+	if (Array.isArray(payload)) {
+		return payload
+			.map((item) => {
+				if (typeof item === "string") return item;
+				if (item && typeof item === "object") {
+					const savedItem = item as SavedLocationItem;
+					return savedItem.locationId || savedItem.location_id || savedItem.id || "";
+				}
+				return "";
+			})
+			.filter(Boolean);
+	}
+
+	if (payload && typeof payload === "object") {
+		const source = payload as Record<string, unknown>;
+		for (const key of ["locations", "savedLocations", "items", "list", "data"]) {
+			const value = source[key];
+			if (value) {
+				return normalizeSavedLocationIds(value);
+			}
+		}
+	}
+
+	return [];
+}
+
 export default function CityInput() {
 	const { t, i18n } = useTranslation();
 	const language = i18n.resolvedLanguage || i18n.language;
+	const weatherApiLang = useMemo(() => getWeatherApiLang(language), [language]);
 	const [selectedCities, setSelectedCities] = useState<SelectedCityWeather[]>([]);
+	const [refreshingAll, setRefreshingAll] = useState(false);
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 	const cityIds = useMemo(() => selectedCities.map((city) => city.location.id), [selectedCities]);
 	const weatherMeta = useMemo(() => getWeatherMeta(t), [t]);
+	const cityIdsRef = useRef<string[]>([]);
+	const initializedLanguageRef = useRef(false);
+	const prevWeatherApiLangRef = useRef(weatherApiLang);
+	const loadFailedTextRef = useRef(t("sys.weather.loadFailed"));
+	const userId = getStringItem(StorageEnum.UserId) || "";
+
+	useEffect(() => {
+		loadFailedTextRef.current = t("sys.weather.loadFailed");
+	}, [t]);
 
 	const handleSortEnd = useCallback((event: DragEndEvent) => {
 		const { active, over } = event;
@@ -199,29 +243,170 @@ export default function CityInput() {
 			}
 
 			try {
-				const res = await weatherService.getWeatherNow({ location: location.id, lang: language });
+				await weatherService.saveLocation({ locationId: location.id });
+				const res = await weatherService.getWeatherNow({ location: location.id, lang: weatherApiLang });
 				updateCityWeather(location.id, (city) => ({ ...city, weather: res.now, loading: false, error: undefined }));
 			} catch (error) {
 				updateCityWeather(location.id, (city) => ({
 					...city,
 					loading: false,
-					error: error instanceof Error ? error.message : t("sys.weather.loadFailed"),
+					error: error instanceof Error ? error.message : loadFailedTextRef.current,
 				}));
 			}
 		},
-		[language, t, updateCityWeather],
+		[updateCityWeather, weatherApiLang],
 	);
 
-	const handleRemoveLocation = useCallback((locationId: string) => {
-		setSelectedCities((currentCities) => currentCities.filter((city) => city.location.id !== locationId));
-	}, []);
+	const refreshAllWeather = useCallback(
+		async (locationIds: string[]) => {
+			if (locationIds.length === 0) {
+				return;
+			}
+
+			setRefreshingAll(true);
+
+			await Promise.all(
+				locationIds.map(async (cityId) => {
+					updateCityWeather(cityId, (currentCity) => ({ ...currentCity, loading: true, error: undefined }));
+
+					try {
+						const res = await weatherService.getWeatherNow({ location: cityId, lang: weatherApiLang });
+						updateCityWeather(cityId, (currentCity) => ({
+							...currentCity,
+							weather: res.now,
+							loading: false,
+							error: undefined,
+						}));
+					} catch (error) {
+						updateCityWeather(cityId, (currentCity) => ({
+							...currentCity,
+							loading: false,
+							error: error instanceof Error ? error.message : loadFailedTextRef.current,
+						}));
+					}
+				}),
+			);
+
+			setRefreshingAll(false);
+		},
+		[updateCityWeather, weatherApiLang],
+	);
+
+	const loadSavedLocations = useCallback(
+		async (lang: string) => {
+			if (!userId) {
+				return;
+			}
+
+			try {
+				const savedPayload = await weatherService.getSavedLocations({ userId });
+				const savedIds = [...new Set(normalizeSavedLocationIds(savedPayload))];
+
+				if (savedIds.length === 0) {
+					setSelectedCities([]);
+					return;
+				}
+
+				const cityEntries = await Promise.all(
+					savedIds.map(async (locationId) => {
+						try {
+							const [locationRes, weatherRes] = await Promise.all([
+								weatherService.searchLocation({ locationName: locationId }),
+								weatherService.getWeatherNow({ location: locationId, lang }),
+							]);
+							const location = locationRes.location?.[0];
+							if (!location) {
+								return null;
+							}
+
+							return {
+								location,
+								weather: weatherRes.now,
+								loading: false,
+							} satisfies SelectedCityWeather;
+						} catch (error) {
+							return {
+								location: {
+									id: locationId,
+									name: locationId,
+									lat: "",
+									lon: "",
+									adm2: "",
+									adm1: "",
+									country: "",
+									tz: "",
+									utcOffset: "",
+									isDst: "",
+									type: "city",
+									rank: "",
+									fxLink: "",
+								},
+								loading: false,
+								error: error instanceof Error ? error.message : loadFailedTextRef.current,
+							} satisfies SelectedCityWeather;
+						}
+					}),
+				);
+
+				setSelectedCities(cityEntries.filter(Boolean) as SelectedCityWeather[]);
+			} catch {
+				setSelectedCities([]);
+			}
+		},
+		[userId],
+	);
+
+	useEffect(() => {
+		cityIdsRef.current = cityIds;
+	}, [cityIds]);
+
+	useEffect(() => {
+		void loadSavedLocations(weatherApiLang);
+	}, [loadSavedLocations, weatherApiLang]);
+
+	useEffect(() => {
+		if (!initializedLanguageRef.current) {
+			initializedLanguageRef.current = true;
+			prevWeatherApiLangRef.current = weatherApiLang;
+			return;
+		}
+
+		if (prevWeatherApiLangRef.current === weatherApiLang) {
+			return;
+		}
+
+		prevWeatherApiLangRef.current = weatherApiLang;
+
+		void refreshAllWeather(cityIdsRef.current);
+	}, [refreshAllWeather, weatherApiLang]);
+
+	const handleRemoveLocation = useCallback(
+		async (locationId: string) => {
+			if (userId) {
+				await weatherService.removeSavedLocation({ userId, locationId });
+			}
+
+			setSelectedCities((currentCities) => currentCities.filter((city) => city.location.id !== locationId));
+		},
+		[userId],
+	);
 
 	return (
 		<div className="space-y-6 p-4 md:p-6">
 			<div className="space-y-3">
-				<div className="space-y-1">
-					<h1 className="text-2xl font-semibold">{t("sys.nav.weather")}</h1>
-					<p className="text-sm text-muted-foreground">{t("sys.weather.pageDescription")}</p>
+				<div className="flex flex-wrap items-start justify-between gap-3">
+					<div className="space-y-1">
+						<h1 className="text-2xl font-semibold">{t("sys.nav.weather")}</h1>
+						<p className="text-sm text-muted-foreground">{t("sys.weather.pageDescription")}</p>
+					</div>
+					<Button
+						variant="outline"
+						onClick={() => void refreshAllWeather(cityIds)}
+						disabled={refreshingAll || cityIds.length === 0}
+					>
+						<RotateCwIcon className={refreshingAll ? "animate-spin" : ""} />
+						{t("common.redo")}
+					</Button>
 				</div>
 				<SearchBox onSelectLocation={handleAddLocation} />
 			</div>

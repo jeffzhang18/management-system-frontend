@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { UserInfo, UserToken } from "#/entity";
 import { StorageEnum } from "#/enum";
 import userService, { type SignInReq } from "@/api/services/userService";
+import { removeItem } from "@/utils/storage";
 
 type UserStore = {
 	userInfo: Partial<UserInfo>;
@@ -30,6 +31,7 @@ const useUserStore = create<UserStore>()(
 					set({ userToken });
 				},
 				clearUserInfoAndToken() {
+					removeItem(StorageEnum.UserId);
 					set({ userInfo: {}, userToken: {} });
 				},
 			},
@@ -64,6 +66,9 @@ export const useSignIn = () => {
 			const { user, accessToken, refreshToken } = res;
 			setUserToken({ accessToken, refreshToken });
 			setUserInfo(user);
+			if (user.user_id) {
+				localStorage.setItem(StorageEnum.UserId, user.user_id);
+			}
 		} catch (err) {
 			toast.error(err.message, {
 				position: "top-center",

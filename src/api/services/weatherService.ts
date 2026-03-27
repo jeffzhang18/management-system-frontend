@@ -2,7 +2,6 @@ import apiClient from "../apiClient";
 
 export interface SearchLocationReq {
 	locationName: string;
-	lang?: string;
 }
 
 export interface LocationInfo {
@@ -39,6 +38,20 @@ export interface WeatherReq {
 	lang?: string;
 }
 
+export interface SaveLocationReq {
+	locationId: string;
+}
+
+export interface SavedLocationItem {
+	locationId?: string;
+	location_id?: string;
+	id?: string;
+}
+
+export interface SavedLocationsReq {
+	userId: string;
+}
+
 export interface DaysWeatherReq extends WeatherReq {
 	days: string;
 }
@@ -72,6 +85,7 @@ export interface WeatherNowResponse {
 }
 
 export enum WeatherApi {
+	SavedLocation = "/weather/saved-location",
 	LocationId = "/weather/location",
 	WeatherNow = "/weather/now",
 	WeatherDays = "/weather/days-prediction",
@@ -80,10 +94,6 @@ export enum WeatherApi {
 
 const searchLocation = (searchLocationReq: SearchLocationReq) => {
 	const params = new URLSearchParams({ location: searchLocationReq.locationName });
-	if (searchLocationReq.lang) {
-		params.set("lang", searchLocationReq.lang);
-	}
-
 	return apiClient.get<SearchLocationResponse>({ url: `${WeatherApi.LocationId}?${params.toString()}` });
 };
 
@@ -96,7 +106,21 @@ const getWeatherNow = (weatherReq: WeatherReq) => {
 	return apiClient.get<WeatherNowResponse>({ url: `${WeatherApi.WeatherNow}?${params.toString()}` });
 };
 
+const saveLocation = (saveLocationReq: SaveLocationReq) =>
+	apiClient.post({ url: WeatherApi.SavedLocation, data: saveLocationReq });
+
+const getSavedLocations = (savedLocationsReq: SavedLocationsReq) =>
+	apiClient.get<unknown>({ url: `${WeatherApi.SavedLocation}?userId=${savedLocationsReq.userId}` });
+
+const removeSavedLocation = (savedLocationsReq: SavedLocationsReq & SaveLocationReq) =>
+	apiClient.delete({
+		url: `${WeatherApi.SavedLocation}?userId=${savedLocationsReq.userId}&locationId=${savedLocationsReq.locationId}`,
+	});
+
 export default {
 	searchLocation,
 	getWeatherNow,
+	saveLocation,
+	getSavedLocations,
+	removeSavedLocation,
 };
