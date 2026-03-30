@@ -11,6 +11,7 @@ import weatherService from "@/api/services/weatherService";
 import { themeVars } from "@/theme/theme.css";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
+import { Skeleton } from "@/ui/skeleton";
 import { getStringItem } from "@/utils/storage";
 import { rgbAlpha } from "@/utils/theme";
 import SearchBox from "./search-box";
@@ -46,6 +47,17 @@ const weatherTextRules = [
 	[/晴/, "Sunny"],
 ] as const;
 
+const weatherImageRules = [
+	{ pattern: /thunder|lightning|storm|雷|暴/, image: weatherImageMap.thunder },
+	{ pattern: /snow|sleet|hail|雪|冰/, image: weatherImageMap.snow },
+	{ pattern: /rain|drizzle|shower|pour|雨/, image: weatherImageMap.rain },
+	{ pattern: /fog|mist|haze|smoke|雾|霾/, image: weatherImageMap.fog },
+	{ pattern: /wind|gust|breeze|飓|风/, image: weatherImageMap.wind },
+	{ pattern: /partly|mostly sunny|mostly clear|间晴|晴间|多云间晴/, image: weatherImageMap.partlyCloudy },
+	{ pattern: /cloud|overcast|阴|云/, image: weatherImageMap.cloudy },
+	{ pattern: /sun|clear|晴/, image: weatherImageMap.sunny },
+] as const;
+
 const windDirectionMap: Record<string, string> = {
 	北风: "North Wind",
 	东北风: "Northeast Wind",
@@ -79,14 +91,20 @@ const softPanelStyle = {
 	background: rgbAlpha(themeVars.colors.background.paper, 0.8),
 	boxShadow: `0 10px 24px ${rgbAlpha(palette.defaultChannel, 0.08)}`,
 };
-const accentChipStyle = {
-	background: rgbAlpha(themeVars.colors.background.paper, 0.8),
+const dragHandleStyle = {
+	background: rgbAlpha(themeVars.colors.background.paper, 0.96),
 	color: themeVars.colors.palette.primary.default,
-	boxShadow: `0 8px 18px ${rgbAlpha(palette.defaultChannel, 0.08)}`,
+	border: `1px solid ${rgbAlpha(palette.defaultChannel, 0.12)}`,
 };
 
 function getWeatherImage(weather?: WeatherNowInfo) {
-	const text = weather?.text || "";
+	const text = (weather?.text || "").trim().toLowerCase();
+
+	for (const rule of weatherImageRules) {
+		if (rule.pattern.test(text)) {
+			return rule.image;
+		}
+	}
 
 	if (/雷/.test(text)) return weatherImageMap.thunder;
 	if (/雪|冰|冻/.test(text)) return weatherImageMap.snow;
@@ -183,6 +201,7 @@ export default function CityInput() {
 	const weatherApiLang = useMemo(() => getWeatherApiLang(language), [language]);
 	const [selectedCities, setSelectedCities] = useState<SelectedCityWeather[]>([]);
 	const [refreshingAll, setRefreshingAll] = useState(false);
+	const [pageLoading, setPageLoading] = useState(true);
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 	const cityIds = useMemo(() => selectedCities.map((city) => city.location.id), [selectedCities]);
 	const weatherMeta = useMemo(() => getWeatherMeta(t), [t]);
@@ -295,6 +314,7 @@ export default function CityInput() {
 	const loadSavedLocations = useCallback(
 		async (lang: string) => {
 			if (!userId) {
+				setPageLoading(false);
 				return;
 			}
 
@@ -304,6 +324,7 @@ export default function CityInput() {
 
 				if (savedIds.length === 0) {
 					setSelectedCities([]);
+					setPageLoading(false);
 					return;
 				}
 
@@ -351,6 +372,8 @@ export default function CityInput() {
 				setSelectedCities(cityEntries.filter(Boolean) as SelectedCityWeather[]);
 			} catch {
 				setSelectedCities([]);
+			} finally {
+				setPageLoading(false);
 			}
 		},
 		[userId],
@@ -414,7 +437,9 @@ export default function CityInput() {
 			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortEnd}>
 				<SortableContext items={cityIds} strategy={rectSortingStrategy}>
 					<div className="flex flex-wrap gap-3">
-						{selectedCities.length > 0 ? (
+						{pageLoading ? (
+							<WeatherCapsuleSkeleton />
+						) : selectedCities.length > 0 ? (
 							selectedCities.map((city) => (
 								<SortableCapsule key={city.location.id} city={city} onRemove={handleRemoveLocation} t={t} />
 							))
@@ -430,7 +455,9 @@ export default function CityInput() {
 			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortEnd}>
 				<SortableContext items={cityIds} strategy={rectSortingStrategy}>
 					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-						{selectedCities.length > 0 ? (
+						{pageLoading ? (
+							<WeatherCardSkeleton />
+						) : selectedCities.length > 0 ? (
 							selectedCities.map((city) => (
 								<SortableWeatherCard
 									key={city.location.id}
@@ -467,7 +494,7 @@ function SortableCapsule({
 		id: city.location.id,
 	});
 	const style: CSSProperties = {
-		transform: CSS.Transform.toString(transform),
+		transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
 		transition,
 		...capsuleStyle,
 	};
@@ -488,7 +515,7 @@ function SortableCapsule({
 			>
 				<GripVerticalIcon className="h-4 w-4" />
 			</button>
-			<span>
+			<span className="whitespace-nowrap">
 				{city.location.country}, {city.location.adm1}, {city.location.name}
 			</span>
 			<button
@@ -528,6 +555,14 @@ function SortableWeatherCard({
 		: getWeatherText(city.weather?.text, language) || t("sys.weather.liveWeather");
 	const windText = city.loading ? "--" : getWindDirectionText(city.weather?.windDir, language);
 	const observedAt = city.error || formatObservationTime(city.weather?.obsTime, language);
+	const feelsLikeMeta = weatherMeta[0];
+	const humidityMeta = weatherMeta[1];
+	const windSpeedMeta = weatherMeta[2];
+	const pressureMeta = weatherMeta[3];
+	const feelsLikeValue = city.weather?.[feelsLikeMeta.key] || "--";
+	const humidityValue = city.weather?.[humidityMeta.key] || "--";
+	const windSpeedValue = city.weather?.[windSpeedMeta.key] || "--";
+	const pressureValue = city.weather?.[pressureMeta.key] || "--";
 
 	return (
 		<Card
@@ -536,21 +571,18 @@ function SortableWeatherCard({
 			className={`gap-4 overflow-hidden border ${isDragging ? "z-10 opacity-85" : ""}`}
 		>
 			<CardHeader className="pb-0">
-				<div className="flex items-start justify-between gap-4">
+				<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
 					<div className="space-y-1">
-						<CardTitle className="text-lg">{city.location.name}</CardTitle>
+						<CardTitle className="truncate text-lg">{city.location.name}</CardTitle>
 						<p className="text-sm text-muted-foreground">
 							{city.location.country}, {city.location.adm1}
 						</p>
 					</div>
-					<div className="flex items-center gap-2">
-						<div style={accentChipStyle} className="rounded-full px-3 py-1 text-xs shadow-sm">
-							{weatherText}
-						</div>
+					<div className="flex shrink-0 items-start justify-end gap-2 justify-self-end">
 						<button
 							type="button"
-							style={accentChipStyle}
-							className="inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-full active:cursor-grabbing"
+							style={dragHandleStyle}
+							className="inline-flex h-9 w-9 shrink-0 cursor-grab items-center justify-center rounded-full active:cursor-grabbing"
 							aria-label={t("sys.weather.dragCard", { city: city.location.name })}
 							{...attributes}
 							{...listeners}
@@ -562,30 +594,29 @@ function SortableWeatherCard({
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<div className="grid grid-cols-[minmax(0,1fr)_112px] gap-4">
-					<div className="flex min-h-[156px] flex-col justify-between rounded-[28px]">
+					<div className="flex min-h-[156px] min-w-0 flex-col rounded-[28px]">
 						<div>
-							<div className="text-5xl font-semibold text-slate-900">
+							<p className="truncate text-sm text-muted-foreground">
+								{observedAt || t("sys.weather.currentWeatherInfo")}
+							</p>
+							<div className="whitespace-nowrap text-5xl font-semibold text-slate-900">
 								{city.loading ? "--" : `${city.weather?.temp ?? "--"}°C`}
 							</div>
-							<p className="mt-2 text-sm text-muted-foreground">{observedAt || t("sys.weather.currentWeatherInfo")}</p>
-						</div>
-						<div className="grid grid-cols-2 gap-3">
-							{weatherMeta.slice(0, 2).map((item) => {
-								const value = city.weather?.[item.key] || "--";
-
-								return (
-									<div key={item.key} style={softPanelStyle} className="rounded-[24px] p-4 shadow-sm">
-										<div className="text-xs text-muted-foreground">{item.label}</div>
-										<div className="mt-2 text-base font-semibold text-slate-900">
-											{city.loading || value === "--" ? value : `${value}${item.unit}`}
-										</div>
+							<div className="mt-4 min-w-0">
+								<div className="truncate whitespace-nowrap text-[11px] text-slate-400">{weatherText}</div>
+								<div className="mt-2 flex min-w-0 items-center gap-2">
+									<div className="truncate whitespace-nowrap text-[11px] text-slate-400">{feelsLikeMeta.label}</div>
+									<div className="truncate whitespace-nowrap text-sm font-medium text-slate-500">
+										{city.loading || feelsLikeValue === "--"
+											? feelsLikeValue
+											: `${feelsLikeValue}${feelsLikeMeta.unit}`}
 									</div>
-								);
-							})}
+								</div>
+							</div>
 						</div>
 					</div>
 
-					<div className="grid grid-rows-[112px_minmax(0,1fr)] gap-3">
+					<div className="grid min-w-0 grid-rows-[112px_minmax(0,1fr)] gap-3">
 						<div style={softPanelStyle} className="flex items-center justify-center rounded-[28px] p-4 shadow-sm">
 							<img
 								src={getWeatherImage(city.weather)}
@@ -594,28 +625,97 @@ function SortableWeatherCard({
 								loading="lazy"
 							/>
 						</div>
-						<div style={softPanelStyle} className="rounded-[24px] p-4 text-right shadow-sm">
-							<div className="text-xs text-muted-foreground">{t("sys.weather.windDirection")}</div>
-							<div className="mt-3 text-sm font-semibold text-slate-800">{windText || t("sys.weather.noData")}</div>
-						</div>
 					</div>
 				</div>
 
 				<div className="grid grid-cols-2 gap-3">
-					{weatherMeta.slice(2).map((item) => {
-						const value = city.weather?.[item.key] || "--";
-
-						return (
-							<div key={item.key} style={softPanelStyle} className="rounded-[24px] p-4 shadow-sm">
-								<div className="text-xs text-muted-foreground">{item.label}</div>
-								<div className="mt-2 text-base font-semibold text-slate-900">
-									{city.loading || value === "--" ? value : `${value}${item.unit}`}
-								</div>
-							</div>
-						);
-					})}
+					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
+						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{windSpeedMeta.label}</div>
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
+							{city.loading || windSpeedValue === "--" ? windSpeedValue : `${windSpeedValue}${windSpeedMeta.unit}`}
+						</div>
+					</div>
+					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
+						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">
+							{t("sys.weather.windDirection")}
+						</div>
+						<div className="mt-2 truncate whitespace-nowrap text-sm font-semibold text-slate-800">
+							{windText || t("sys.weather.noData")}
+						</div>
+					</div>
+					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
+						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{humidityMeta.label}</div>
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
+							{city.loading || humidityValue === "--" ? humidityValue : `${humidityValue}${humidityMeta.unit}`}
+						</div>
+					</div>
+					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
+						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{pressureMeta.label}</div>
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
+							{city.loading || pressureValue === "--" ? pressureValue : `${pressureValue}${pressureMeta.unit}`}
+						</div>
+					</div>
 				</div>
 			</CardContent>
 		</Card>
+	);
+}
+
+function WeatherCapsuleSkeleton() {
+	return (
+		<>
+			<Skeleton className="h-11 w-56 rounded-full border" style={capsuleStyle} />
+			<Skeleton className="h-11 w-64 rounded-full border" style={capsuleStyle} />
+			<Skeleton className="h-11 w-52 rounded-full border" style={capsuleStyle} />
+		</>
+	);
+}
+
+function WeatherCardSkeleton() {
+	const skeletonCardKeys = ["weather-skeleton-1", "weather-skeleton-2", "weather-skeleton-3"] as const;
+	const skeletonPanelKeys = ["panel-wind-speed", "panel-wind-direction", "panel-humidity", "panel-pressure"] as const;
+
+	return (
+		<>
+			{skeletonCardKeys.map((cardKey) => (
+				<Card key={cardKey} className="overflow-hidden border" style={cardStyle}>
+					<CardHeader className="pb-0">
+						<div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+							<div className="space-y-2">
+								<Skeleton className="h-8 w-28 rounded-xl" />
+								<Skeleton className="h-5 w-44 rounded-lg" />
+							</div>
+							<Skeleton className="h-9 w-9 rounded-full border" style={dragHandleStyle} />
+						</div>
+					</CardHeader>
+					<CardContent className="space-y-4">
+						<div className="grid grid-cols-[minmax(0,1fr)_112px] gap-4">
+							<div className="space-y-4">
+								<Skeleton className="h-5 w-28 rounded-lg" />
+								<Skeleton className="h-16 w-32 rounded-2xl" />
+								<div className="space-y-2 pt-1">
+									<Skeleton className="h-4 w-12 rounded-lg" />
+									<div className="flex items-center gap-2">
+										<Skeleton className="h-4 w-16 rounded-lg" />
+										<Skeleton className="h-4 w-20 rounded-lg" />
+									</div>
+								</div>
+							</div>
+							<div className="rounded-[28px] p-4" style={softPanelStyle}>
+								<Skeleton className="h-full min-h-[156px] w-full rounded-[20px]" />
+							</div>
+						</div>
+						<div className="grid grid-cols-2 gap-3">
+							{skeletonPanelKeys.map((panelKey) => (
+								<div key={`${cardKey}-${panelKey}`} className="space-y-3 rounded-[24px] p-4" style={softPanelStyle}>
+									<Skeleton className="h-4 w-14 rounded-lg" />
+									<Skeleton className="h-8 w-24 rounded-xl" />
+								</div>
+							))}
+						</div>
+					</CardContent>
+				</Card>
+			))}
+		</>
 	);
 }
