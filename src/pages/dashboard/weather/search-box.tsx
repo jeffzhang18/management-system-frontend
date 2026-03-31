@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
 import type { LocationInfo, SearchLocationReq } from "@/api/services/weatherService";
 import weatherService from "@/api/services/weatherService";
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Input } from "@/ui/input";
 
