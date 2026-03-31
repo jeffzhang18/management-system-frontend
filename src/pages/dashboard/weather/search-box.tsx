@@ -8,7 +8,6 @@ import { Input } from "@/ui/input";
 interface SearchBoxProps {
 	onSelectLocation?: (location: LocationInfo) => void;
 }
-
 const SearchBox = ({ onSelectLocation }: SearchBoxProps) => {
 	const { t } = useTranslation();
 	const [inputValue, setInputValue] = useState<string>("");
