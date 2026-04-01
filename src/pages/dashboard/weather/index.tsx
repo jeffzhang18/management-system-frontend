@@ -80,7 +80,7 @@ const cardStyle = {
 const capsuleStyle = {
 	borderColor: rgbAlpha(palette.defaultChannel, 0.18),
 	background: `linear-gradient(135deg, ${rgbAlpha(palette.lighter, 0.24)} 0%, ${rgbAlpha(themeVars.colors.background.paper, 0.96)} 100%)`,
-	color: themeVars.colors.text.primary,
+	color: themeVars.colors.palette.primary.darker,
 	boxShadow: `0 8px 20px ${rgbAlpha(palette.defaultChannel, 0.1)}`,
 };
 const capsuleHandleStyle = {
@@ -168,18 +168,17 @@ function getWeatherMeta(t: TFunction) {
 	] as const;
 }
 
-function normalizeSavedLocationIds(payload: unknown): string[] {
+function normalizeSavedLocationItems(payload: unknown): SavedLocationItem[] {
 	if (Array.isArray(payload)) {
 		return payload
 			.map((item) => {
-				if (typeof item === "string") return item;
+				if (typeof item === "string") return { locationId: item };
 				if (item && typeof item === "object") {
-					const savedItem = item as SavedLocationItem;
-					return savedItem.locationId || savedItem.location_id || savedItem.id || "";
+					return item as SavedLocationItem;
 				}
-				return "";
+				return null;
 			})
-			.filter(Boolean);
+			.filter(Boolean) as SavedLocationItem[];
 	}
 
 	if (payload && typeof payload === "object") {
@@ -187,7 +186,7 @@ function normalizeSavedLocationIds(payload: unknown): string[] {
 		for (const key of ["locations", "savedLocations", "items", "list", "data"]) {
 			const value = source[key];
 			if (value) {
-				return normalizeSavedLocationIds(value);
+				return normalizeSavedLocationItems(value);
 			}
 		}
 	}
@@ -215,48 +214,24 @@ export default function CityInput() {
 		loadFailedTextRef.current = t("sys.weather.loadFailed");
 	}, [t]);
 
-	const persistLocationList = useCallback(
-		async (locationList: string[]) => {
-			if (!userId) {
-				return;
+	const handleSortEnd = useCallback((event: DragEndEvent) => {
+		const { active, over } = event;
+
+		if (!over || active.id === over.id) {
+			return;
+		}
+
+		setSelectedCities((currentCities) => {
+			const oldIndex = currentCities.findIndex((city) => city.location.id === active.id);
+			const newIndex = currentCities.findIndex((city) => city.location.id === over.id);
+
+			if (oldIndex < 0 || newIndex < 0) {
+				return currentCities;
 			}
 
-			try {
-				await weatherService.saveLocationList({ locationList });
-			} catch {
-				// Best-effort persistence; ignore failures to keep UI responsive.
-			}
-		},
-		[userId],
-	);
-
-	const handleSortEnd = useCallback(
-		(event: DragEndEvent) => {
-			const { active, over } = event;
-
-			if (!over || active.id === over.id) {
-				return;
-			}
-
-			let nextIds: string[] = [];
-			setSelectedCities((currentCities) => {
-				const oldIndex = currentCities.findIndex((city) => city.location.id === active.id);
-				const newIndex = currentCities.findIndex((city) => city.location.id === over.id);
-
-				if (oldIndex < 0 || newIndex < 0) {
-					return currentCities;
-				}
-
-				const nextCities = arrayMove(currentCities, oldIndex, newIndex);
-				nextIds = nextCities.map((city) => city.location.id);
-				return nextCities;
-			});
-			if (nextIds.length > 0) {
-				void persistLocationList(nextIds);
-			}
-		},
-		[persistLocationList],
-	);
+			return arrayMove(currentCities, oldIndex, newIndex);
+		});
+	}, []);
 
 	const updateCityWeather = useCallback(
 		(locationId: string, updater: (city: SelectedCityWeather) => SelectedCityWeather) => {
@@ -270,7 +245,6 @@ export default function CityInput() {
 	const handleAddLocation = useCallback(
 		async (location: LocationInfo) => {
 			let shouldFetch = false;
-			let nextIds: string[] = [];
 
 			setSelectedCities((currentCities) => {
 				const existingCity = currentCities.find((city) => city.location.id === location.id);
@@ -279,9 +253,7 @@ export default function CityInput() {
 				}
 
 				shouldFetch = true;
-				const nextCities = [...currentCities, { location, loading: true }];
-				nextIds = nextCities.map((city) => city.location.id);
-				return nextCities;
+				return [...currentCities, { location, loading: true }];
 			});
 
 			if (!shouldFetch) {
@@ -289,9 +261,14 @@ export default function CityInput() {
 			}
 
 			try {
-				await weatherService.saveLocation({ locationId: location.id });
-				if (nextIds.length > 0) {
-					void persistLocationList(nextIds);
+				if (userId) {
+					await weatherService.saveLocation({
+						userId,
+						locationId: location.id,
+						country: location.country,
+						name: location.name,
+						adm1: location.adm1,
+					});
 				}
 				const res = await weatherService.getWeatherNow({ location: location.id, lang: weatherApiLang });
 				updateCityWeather(location.id, (city) => ({ ...city, weather: res.now, loading: false, error: undefined }));
@@ -303,7 +280,7 @@ export default function CityInput() {
 				}));
 			}
 		},
-		[persistLocationList, updateCityWeather, weatherApiLang],
+		[updateCityWeather, weatherApiLang, userId],
 	);
 
 	const refreshAllWeather = useCallback(
@@ -349,56 +326,78 @@ export default function CityInput() {
 			}
 
 			try {
-				const [savedListRes, savedPayload] = await Promise.all([
-					weatherService.getSavedLocationList(),
-					weatherService.getSavedLocations({ userId }),
-				]);
-				const orderedIds = savedListRes?.data ?? [];
-				const savedIds = [...new Set(normalizeSavedLocationIds(savedPayload))];
-				const finalIds = orderedIds.length
-					? [...orderedIds.filter((id) => savedIds.includes(id)), ...savedIds.filter((id) => !orderedIds.includes(id))]
-					: savedIds;
+				const savedPayload = await weatherService.getSavedLocations({ userId });
+				const savedItems = normalizeSavedLocationItems(savedPayload);
+				const savedIds = [
+					...new Set(savedItems.map((item) => item.locationId || item.location_id || item.id || "").filter(Boolean)),
+				];
+				const savedMetaMap = new Map(
+					savedItems
+						.map((item) => {
+							const id = item.locationId || item.location_id || item.id || "";
+							return id
+								? [
+										id,
+										{
+											country: item.country || "",
+											name: item.name || "",
+											adm1: item.adm1 || "",
+										},
+									]
+								: null;
+						})
+						.filter(Boolean) as Array<[string, { country: string; name: string; adm1: string }]>,
+				);
 
-				if (finalIds.length === 0) {
+				if (savedIds.length === 0) {
 					setSelectedCities([]);
 					setPageLoading(false);
 					return;
 				}
 
 				const cityEntries = await Promise.all(
-					finalIds.map(async (locationId) => {
+					savedIds.map(async (locationId) => {
+						const savedMeta = savedMetaMap.get(locationId);
+						const fallbackLocation: LocationInfo = {
+							id: locationId,
+							name: savedMeta?.name || locationId,
+							lat: "",
+							lon: "",
+							adm2: "",
+							adm1: savedMeta?.adm1 || "",
+							country: savedMeta?.country || "",
+							tz: "",
+							utcOffset: "",
+							isDst: "",
+							type: "city",
+							rank: "",
+							fxLink: "",
+						};
+
 						try {
 							const [locationRes, weatherRes] = await Promise.all([
 								weatherService.searchLocation({ locationName: locationId }),
 								weatherService.getWeatherNow({ location: locationId, lang }),
 							]);
 							const location = locationRes.location?.[0];
-							if (!location) {
-								return null;
-							}
+							const mergedLocation = location
+								? {
+										...location,
+										id: location.id || locationId,
+										name: savedMeta?.name || location.name || locationId,
+										adm1: savedMeta?.adm1 || location.adm1 || "",
+										country: savedMeta?.country || location.country || "",
+									}
+								: fallbackLocation;
 
 							return {
-								location,
+								location: mergedLocation,
 								weather: weatherRes.now,
 								loading: false,
 							} satisfies SelectedCityWeather;
 						} catch (error) {
 							return {
-								location: {
-									id: locationId,
-									name: locationId,
-									lat: "",
-									lon: "",
-									adm2: "",
-									adm1: "",
-									country: "",
-									tz: "",
-									utcOffset: "",
-									isDst: "",
-									type: "city",
-									rank: "",
-									fxLink: "",
-								},
+								location: fallbackLocation,
 								loading: false,
 								error: error instanceof Error ? error.message : loadFailedTextRef.current,
 							} satisfies SelectedCityWeather;
@@ -446,15 +445,9 @@ export default function CityInput() {
 				await weatherService.removeSavedLocation({ userId, locationId });
 			}
 
-			let nextIds: string[] = [];
-			setSelectedCities((currentCities) => {
-				const nextCities = currentCities.filter((city) => city.location.id !== locationId);
-				nextIds = nextCities.map((city) => city.location.id);
-				return nextCities;
-			});
-			void persistLocationList(nextIds);
+			setSelectedCities((currentCities) => currentCities.filter((city) => city.location.id !== locationId));
 		},
-		[persistLocationList, userId],
+		[userId],
 	);
 
 	return (
@@ -642,14 +635,14 @@ function SortableWeatherCard({
 							<p className="truncate text-sm text-muted-foreground">
 								{observedAt || t("sys.weather.currentWeatherInfo")}
 							</p>
-							<div className="whitespace-nowrap text-5xl font-semibold text-foreground">
+							<div className="whitespace-nowrap text-5xl font-semibold text-slate-900">
 								{city.loading ? "--" : `${city.weather?.temp ?? "--"}°C`}
 							</div>
 							<div className="mt-4 min-w-0">
-								<div className="truncate whitespace-nowrap text-[11px] text-foreground/80">{weatherText}</div>
+								<div className="truncate whitespace-nowrap text-[11px] text-slate-400">{weatherText}</div>
 								<div className="mt-2 flex min-w-0 items-center gap-2">
-									<div className="truncate whitespace-nowrap text-[11px] text-foreground/80">{feelsLikeMeta.label}</div>
-									<div className="truncate whitespace-nowrap text-sm font-medium text-foreground/85">
+									<div className="truncate whitespace-nowrap text-[11px] text-slate-400">{feelsLikeMeta.label}</div>
+									<div className="truncate whitespace-nowrap text-sm font-medium text-slate-500">
 										{city.loading || feelsLikeValue === "--"
 											? feelsLikeValue
 											: `${feelsLikeValue}${feelsLikeMeta.unit}`}
@@ -674,7 +667,7 @@ function SortableWeatherCard({
 				<div className="grid grid-cols-2 gap-3">
 					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{windSpeedMeta.label}</div>
-						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-foreground">
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
 							{city.loading || windSpeedValue === "--" ? windSpeedValue : `${windSpeedValue}${windSpeedMeta.unit}`}
 						</div>
 					</div>
@@ -682,19 +675,19 @@ function SortableWeatherCard({
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">
 							{t("sys.weather.windDirection")}
 						</div>
-						<div className="mt-2 truncate whitespace-nowrap text-sm font-semibold text-foreground/90">
+						<div className="mt-2 truncate whitespace-nowrap text-sm font-semibold text-slate-800">
 							{windText || t("sys.weather.noData")}
 						</div>
 					</div>
 					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{humidityMeta.label}</div>
-						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-foreground">
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
 							{city.loading || humidityValue === "--" ? humidityValue : `${humidityValue}${humidityMeta.unit}`}
 						</div>
 					</div>
 					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{pressureMeta.label}</div>
-						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-foreground">
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
 							{city.loading || pressureValue === "--" ? pressureValue : `${pressureValue}${pressureMeta.unit}`}
 						</div>
 					</div>
