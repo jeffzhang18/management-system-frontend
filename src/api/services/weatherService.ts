@@ -64,6 +64,15 @@ export interface RemoveSavedLocationReq {
 	locationId: string;
 }
 
+export interface SaveLocationListReq {
+	locationList: string[];
+}
+
+export interface SavedLocationListReq {
+	page?: number;
+	pageSize?: number;
+}
+
 export interface DaysWeatherReq extends WeatherReq {
 	days: string;
 }
@@ -98,6 +107,7 @@ export interface WeatherNowResponse {
 
 export enum WeatherApi {
 	SavedLocation = "/weather/saved-location",
+	SavedLocationList = "/weather/saved-location-list",
 	LocationId = "/weather/location",
 	WeatherNow = "/weather/now",
 	WeatherDays = "/weather/days-prediction",
@@ -129,10 +139,25 @@ const removeSavedLocation = (savedLocationsReq: RemoveSavedLocationReq) =>
 		url: `${WeatherApi.SavedLocation}?userId=${savedLocationsReq.userId}&locationId=${savedLocationsReq.locationId}`,
 	});
 
+const getSavedLocationList = (savedLocationListReq: SavedLocationListReq = {}) => {
+	const params = new URLSearchParams();
+	if (savedLocationListReq.page) params.set("page", String(savedLocationListReq.page));
+	if (savedLocationListReq.pageSize) params.set("pageSize", String(savedLocationListReq.pageSize));
+	const query = params.toString();
+	return apiClient.get<unknown>({
+		url: query ? `${WeatherApi.SavedLocationList}?${query}` : WeatherApi.SavedLocationList,
+	});
+};
+
+const saveLocationList = (saveLocationListReq: SaveLocationListReq) =>
+	apiClient.post({ url: WeatherApi.SavedLocationList, data: saveLocationListReq });
+
 export default {
 	searchLocation,
 	getWeatherNow,
 	saveLocation,
 	getSavedLocations,
 	removeSavedLocation,
+	getSavedLocationList,
+	saveLocationList,
 };

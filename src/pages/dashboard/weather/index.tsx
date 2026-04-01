@@ -194,6 +194,8 @@ function normalizeSavedLocationItems(payload: unknown): SavedLocationItem[] {
 	return [];
 }
 
+const PAGE_SIZE = 9;
+
 export default function CityInput() {
 	const { t, i18n } = useTranslation();
 	const language = i18n.resolvedLanguage || i18n.language;
@@ -201,10 +203,16 @@ export default function CityInput() {
 	const [selectedCities, setSelectedCities] = useState<SelectedCityWeather[]>([]);
 	const [refreshingAll, setRefreshingAll] = useState(false);
 	const [pageLoading, setPageLoading] = useState(true);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [visibleCardCount, setVisibleCardCount] = useState(0);
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 	const cityIds = useMemo(() => selectedCities.map((city) => city.location.id), [selectedCities]);
+	const visibleCityIds = useMemo(() => cityIds.slice(0, visibleCardCount), [cityIds, visibleCardCount]);
+	const visibleCities = useMemo(() => selectedCities.slice(0, visibleCardCount), [selectedCities, visibleCardCount]);
 	const weatherMeta = useMemo(() => getWeatherMeta(t), [t]);
 	const cityIdsRef = useRef<string[]>([]);
+	const visibleCardCountRef = useRef(0);
+	const loadingMoreRef = useRef(false);
 	const initializedLanguageRef = useRef(false);
 	const prevWeatherApiLangRef = useRef(weatherApiLang);
 	const loadFailedTextRef = useRef(t("sys.weather.loadFailed"));
@@ -213,25 +221,6 @@ export default function CityInput() {
 	useEffect(() => {
 		loadFailedTextRef.current = t("sys.weather.loadFailed");
 	}, [t]);
-
-	const handleSortEnd = useCallback((event: DragEndEvent) => {
-		const { active, over } = event;
-
-		if (!over || active.id === over.id) {
-			return;
-		}
-
-		setSelectedCities((currentCities) => {
-			const oldIndex = currentCities.findIndex((city) => city.location.id === active.id);
-			const newIndex = currentCities.findIndex((city) => city.location.id === over.id);
-
-			if (oldIndex < 0 || newIndex < 0) {
-				return currentCities;
-			}
-
-			return arrayMove(currentCities, oldIndex, newIndex);
-		});
-	}, []);
 
 	const updateCityWeather = useCallback(
 		(locationId: string, updater: (city: SelectedCityWeather) => SelectedCityWeather) => {
@@ -245,20 +234,28 @@ export default function CityInput() {
 	const handleAddLocation = useCallback(
 		async (location: LocationInfo) => {
 			let shouldFetch = false;
+			let nextLength = 0;
+			let nextLocationIds: string[] = [];
 
 			setSelectedCities((currentCities) => {
 				const existingCity = currentCities.find((city) => city.location.id === location.id);
 				if (existingCity) {
+					nextLength = currentCities.length;
+					nextLocationIds = currentCities.map((city) => city.location.id);
 					return currentCities;
 				}
 
 				shouldFetch = true;
+				nextLength = currentCities.length + 1;
+				nextLocationIds = [...currentCities.map((city) => city.location.id), location.id];
 				return [...currentCities, { location, loading: true }];
 			});
 
 			if (!shouldFetch) {
 				return;
 			}
+
+			setVisibleCardCount((count) => Math.min(Math.max(count + 1, PAGE_SIZE), nextLength));
 
 			try {
 				if (userId) {
@@ -269,6 +266,7 @@ export default function CityInput() {
 						name: location.name,
 						adm1: location.adm1,
 					});
+					await weatherService.saveLocationList({ locationList: nextLocationIds });
 				}
 				const res = await weatherService.getWeatherNow({ location: location.id, lang: weatherApiLang });
 				updateCityWeather(location.id, (city) => ({ ...city, weather: res.now, loading: false, error: undefined }));
@@ -318,101 +316,147 @@ export default function CityInput() {
 		[updateCityWeather, weatherApiLang],
 	);
 
+	const fetchWeatherForIds = useCallback(
+		async (locationIds: string[], lang: string) => {
+			if (locationIds.length === 0) {
+				return;
+			}
+
+			await Promise.all(
+				locationIds.map(async (locationId) => {
+					updateCityWeather(locationId, (currentCity) => ({ ...currentCity, loading: true, error: undefined }));
+
+					try {
+						const res = await weatherService.getWeatherNow({ location: locationId, lang });
+						updateCityWeather(locationId, (currentCity) => ({
+							...currentCity,
+							weather: res.now,
+							loading: false,
+							error: undefined,
+						}));
+					} catch (error) {
+						updateCityWeather(locationId, (currentCity) => ({
+							...currentCity,
+							loading: false,
+							error: error instanceof Error ? error.message : loadFailedTextRef.current,
+						}));
+					}
+				}),
+			);
+		},
+		[updateCityWeather],
+	);
+
+	const handleSortEnd = useCallback(
+		(event: DragEndEvent) => {
+			const { active, over } = event;
+
+			if (!over || active.id === over.id) {
+				return;
+			}
+
+			const oldIndex = selectedCities.findIndex((city) => city.location.id === active.id);
+			const newIndex = selectedCities.findIndex((city) => city.location.id === over.id);
+
+			if (oldIndex < 0 || newIndex < 0) {
+				return;
+			}
+
+			const sortedCities = arrayMove(selectedCities, oldIndex, newIndex);
+			const sortedIds = sortedCities.map((city) => city.location.id);
+			const frontVisibleIds = sortedIds.slice(0, visibleCardCountRef.current);
+			const frontSet = new Set(frontVisibleIds);
+			const idsToFetch = sortedCities
+				.filter((city) => frontSet.has(city.location.id) && !city.weather && !city.loading)
+				.map((city) => city.location.id);
+
+			if (idsToFetch.length > 0) {
+				const fetchSet = new Set(idsToFetch);
+				setSelectedCities(
+					sortedCities.map((city) =>
+						fetchSet.has(city.location.id) ? { ...city, loading: true, error: undefined } : city,
+					),
+				);
+				void fetchWeatherForIds(idsToFetch, weatherApiLang);
+			} else {
+				setSelectedCities(sortedCities);
+			}
+
+			if (sortedIds.length > 0) {
+				void weatherService.saveLocationList({ locationList: sortedIds });
+			}
+		},
+		[fetchWeatherForIds, selectedCities, weatherApiLang],
+	);
+
 	const loadSavedLocations = useCallback(
 		async (lang: string) => {
 			if (!userId) {
 				setPageLoading(false);
+				setSelectedCities([]);
+				setVisibleCardCount(0);
 				return;
 			}
 
+			setPageLoading(true);
+			setSelectedCities([]);
+			setVisibleCardCount(0);
+
 			try {
-				const savedPayload = await weatherService.getSavedLocations({ userId });
+				const savedPayload = await weatherService.getSavedLocationList();
 				const savedItems = normalizeSavedLocationItems(savedPayload);
 				const savedIds = [
 					...new Set(savedItems.map((item) => item.locationId || item.location_id || item.id || "").filter(Boolean)),
 				];
+
+				if (savedIds.length === 0) {
+					setSelectedCities([]);
+					return;
+				}
+
 				const savedMetaMap = new Map(
 					savedItems
 						.map((item) => {
 							const id = item.locationId || item.location_id || item.id || "";
-							return id
-								? [
-										id,
-										{
-											country: item.country || "",
-											name: item.name || "",
-											adm1: item.adm1 || "",
-										},
-									]
-								: null;
+							return id ? [id, { country: item.country || "", name: item.name || "", adm1: item.adm1 || "" }] : null;
 						})
 						.filter(Boolean) as Array<[string, { country: string; name: string; adm1: string }]>,
 				);
 
-				if (savedIds.length === 0) {
-					setSelectedCities([]);
-					setPageLoading(false);
-					return;
-				}
-
-				const cityEntries = await Promise.all(
-					savedIds.map(async (locationId) => {
-						const savedMeta = savedMetaMap.get(locationId);
-						const fallbackLocation: LocationInfo = {
+				const baseCities = savedIds.map((locationId) => {
+					const meta = savedMetaMap.get(locationId);
+					return {
+						location: {
 							id: locationId,
-							name: savedMeta?.name || locationId,
+							name: meta?.name || locationId,
 							lat: "",
 							lon: "",
 							adm2: "",
-							adm1: savedMeta?.adm1 || "",
-							country: savedMeta?.country || "",
+							adm1: meta?.adm1 || "",
+							country: meta?.country || "",
 							tz: "",
 							utcOffset: "",
 							isDst: "",
 							type: "city",
 							rank: "",
 							fxLink: "",
-						};
+						},
+						loading: false,
+					} satisfies SelectedCityWeather;
+				});
 
-						try {
-							const [locationRes, weatherRes] = await Promise.all([
-								weatherService.searchLocation({ locationName: locationId }),
-								weatherService.getWeatherNow({ location: locationId, lang }),
-							]);
-							const location = locationRes.location?.[0];
-							const mergedLocation = location
-								? {
-										...location,
-										id: location.id || locationId,
-										name: savedMeta?.name || location.name || locationId,
-										adm1: savedMeta?.adm1 || location.adm1 || "",
-										country: savedMeta?.country || location.country || "",
-									}
-								: fallbackLocation;
-
-							return {
-								location: mergedLocation,
-								weather: weatherRes.now,
-								loading: false,
-							} satisfies SelectedCityWeather;
-						} catch (error) {
-							return {
-								location: fallbackLocation,
-								loading: false,
-								error: error instanceof Error ? error.message : loadFailedTextRef.current,
-							} satisfies SelectedCityWeather;
-						}
-					}),
-				);
-
-				setSelectedCities(cityEntries.filter(Boolean) as SelectedCityWeather[]);
+				setSelectedCities(baseCities);
+				const initialCount = Math.min(PAGE_SIZE, baseCities.length);
+				setVisibleCardCount(initialCount);
+				await fetchWeatherForIds(savedIds.slice(0, initialCount), lang);
 			} catch {
 				setSelectedCities([]);
+				setVisibleCardCount(0);
 			} finally {
 				setPageLoading(false);
 			}
 		},
-		[userId],
+		[fetchWeatherForIds, userId],
 	);
 
 	useEffect(() => {
@@ -420,8 +464,40 @@ export default function CityInput() {
 	}, [cityIds]);
 
 	useEffect(() => {
+		visibleCardCountRef.current = visibleCardCount;
+	}, [visibleCardCount]);
+
+	useEffect(() => {
 		void loadSavedLocations(weatherApiLang);
 	}, [loadSavedLocations, weatherApiLang]);
+
+	useEffect(() => {
+		const onScroll = () => {
+			if (pageLoading || loadingMoreRef.current) {
+				return;
+			}
+
+			if (visibleCardCountRef.current >= cityIdsRef.current.length) {
+				return;
+			}
+
+			if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 140) {
+				const start = visibleCardCountRef.current;
+				const end = Math.min(start + PAGE_SIZE, cityIdsRef.current.length);
+				const ids = cityIdsRef.current.slice(start, end);
+				loadingMoreRef.current = true;
+				setLoadingMore(true);
+				setVisibleCardCount(end);
+				void fetchWeatherForIds(ids, weatherApiLang).finally(() => {
+					loadingMoreRef.current = false;
+					setLoadingMore(false);
+				});
+			}
+		};
+
+		window.addEventListener("scroll", onScroll, { passive: true });
+		return () => window.removeEventListener("scroll", onScroll);
+	}, [fetchWeatherForIds, pageLoading, weatherApiLang]);
 
 	useEffect(() => {
 		if (!initializedLanguageRef.current) {
@@ -436,16 +512,26 @@ export default function CityInput() {
 
 		prevWeatherApiLangRef.current = weatherApiLang;
 
-		void refreshAllWeather(cityIdsRef.current);
+		void refreshAllWeather(cityIdsRef.current.slice(0, visibleCardCountRef.current));
 	}, [refreshAllWeather, weatherApiLang]);
 
 	const handleRemoveLocation = useCallback(
 		async (locationId: string) => {
+			let nextLocationIds: string[] = [];
 			if (userId) {
 				await weatherService.removeSavedLocation({ userId, locationId });
 			}
 
-			setSelectedCities((currentCities) => currentCities.filter((city) => city.location.id !== locationId));
+			setSelectedCities((currentCities) => {
+				const nextCities = currentCities.filter((city) => city.location.id !== locationId);
+				nextLocationIds = nextCities.map((city) => city.location.id);
+				setVisibleCardCount((count) => Math.min(count, nextCities.length));
+				return nextCities;
+			});
+
+			if (userId) {
+				await weatherService.saveLocationList({ locationList: nextLocationIds });
+			}
 		},
 		[userId],
 	);
@@ -460,8 +546,8 @@ export default function CityInput() {
 					</div>
 					<Button
 						variant="outline"
-						onClick={() => void refreshAllWeather(cityIds)}
-						disabled={refreshingAll || cityIds.length === 0}
+						onClick={() => void refreshAllWeather(visibleCityIds)}
+						disabled={refreshingAll || visibleCityIds.length === 0}
 					>
 						<RotateCwIcon className={refreshingAll ? "animate-spin" : ""} />
 						{t("common.redo")}
@@ -489,12 +575,12 @@ export default function CityInput() {
 			</DndContext>
 
 			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortEnd}>
-				<SortableContext items={cityIds} strategy={rectSortingStrategy}>
+				<SortableContext items={visibleCityIds} strategy={rectSortingStrategy}>
 					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
 						{pageLoading ? (
 							<WeatherCardSkeleton />
-						) : selectedCities.length > 0 ? (
-							selectedCities.map((city) => (
+						) : visibleCities.length > 0 ? (
+							visibleCities.map((city) => (
 								<SortableWeatherCard
 									key={city.location.id}
 									city={city}
@@ -513,6 +599,8 @@ export default function CityInput() {
 					</div>
 				</SortableContext>
 			</DndContext>
+
+			{loadingMore && <div className="text-center text-sm text-muted-foreground">{t("common.loadingText")}</div>}
 		</div>
 	);
 }
