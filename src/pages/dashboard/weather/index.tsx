@@ -80,7 +80,7 @@ const cardStyle = {
 const capsuleStyle = {
 	borderColor: rgbAlpha(palette.defaultChannel, 0.18),
 	background: `linear-gradient(135deg, ${rgbAlpha(palette.lighter, 0.24)} 0%, ${rgbAlpha(themeVars.colors.background.paper, 0.96)} 100%)`,
-	color: themeVars.colors.palette.primary.darker,
+	color: themeVars.colors.text.primary,
 	boxShadow: `0 8px 20px ${rgbAlpha(palette.defaultChannel, 0.1)}`,
 };
 const capsuleHandleStyle = {
@@ -599,14 +599,14 @@ function SortableWeatherCard({
 							<p className="truncate text-sm text-muted-foreground">
 								{observedAt || t("sys.weather.currentWeatherInfo")}
 							</p>
-							<div className="whitespace-nowrap text-5xl font-semibold text-slate-900">
+							<div className="whitespace-nowrap text-5xl font-semibold text-foreground">
 								{city.loading ? "--" : `${city.weather?.temp ?? "--"}°C`}
 							</div>
 							<div className="mt-4 min-w-0">
-								<div className="truncate whitespace-nowrap text-[11px] text-slate-400">{weatherText}</div>
+								<div className="truncate whitespace-nowrap text-[11px] text-foreground/80">{weatherText}</div>
 								<div className="mt-2 flex min-w-0 items-center gap-2">
-									<div className="truncate whitespace-nowrap text-[11px] text-slate-400">{feelsLikeMeta.label}</div>
-									<div className="truncate whitespace-nowrap text-sm font-medium text-slate-500">
+									<div className="truncate whitespace-nowrap text-[11px] text-foreground/80">{feelsLikeMeta.label}</div>
+									<div className="truncate whitespace-nowrap text-sm font-medium text-foreground/85">
 										{city.loading || feelsLikeValue === "--"
 											? feelsLikeValue
 											: `${feelsLikeValue}${feelsLikeMeta.unit}`}
@@ -631,7 +631,7 @@ function SortableWeatherCard({
 				<div className="grid grid-cols-2 gap-3">
 					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{windSpeedMeta.label}</div>
-						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-foreground">
 							{city.loading || windSpeedValue === "--" ? windSpeedValue : `${windSpeedValue}${windSpeedMeta.unit}`}
 						</div>
 					</div>
@@ -639,19 +639,19 @@ function SortableWeatherCard({
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">
 							{t("sys.weather.windDirection")}
 						</div>
-						<div className="mt-2 truncate whitespace-nowrap text-sm font-semibold text-slate-800">
+						<div className="mt-2 truncate whitespace-nowrap text-sm font-semibold text-foreground/90">
 							{windText || t("sys.weather.noData")}
 						</div>
 					</div>
 					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{humidityMeta.label}</div>
-						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-foreground">
 							{city.loading || humidityValue === "--" ? humidityValue : `${humidityValue}${humidityMeta.unit}`}
 						</div>
 					</div>
 					<div style={softPanelStyle} className="min-w-0 rounded-[24px] p-4 shadow-sm">
 						<div className="truncate whitespace-nowrap text-[11px] text-muted-foreground">{pressureMeta.label}</div>
-						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-slate-900">
+						<div className="mt-2 truncate whitespace-nowrap text-base font-semibold text-foreground">
 							{city.loading || pressureValue === "--" ? pressureValue : `${pressureValue}${pressureMeta.unit}`}
 						</div>
 					</div>
