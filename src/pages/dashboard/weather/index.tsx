@@ -215,24 +215,48 @@ export default function CityInput() {
 		loadFailedTextRef.current = t("sys.weather.loadFailed");
 	}, [t]);
 
-	const handleSortEnd = useCallback((event: DragEndEvent) => {
-		const { active, over } = event;
-
-		if (!over || active.id === over.id) {
-			return;
-		}
-
-		setSelectedCities((currentCities) => {
-			const oldIndex = currentCities.findIndex((city) => city.location.id === active.id);
-			const newIndex = currentCities.findIndex((city) => city.location.id === over.id);
-
-			if (oldIndex < 0 || newIndex < 0) {
-				return currentCities;
+	const persistLocationList = useCallback(
+		async (locationList: string[]) => {
+			if (!userId) {
+				return;
 			}
 
-			return arrayMove(currentCities, oldIndex, newIndex);
-		});
-	}, []);
+			try {
+				await weatherService.saveLocationList({ locationList });
+			} catch {
+				// Best-effort persistence; ignore failures to keep UI responsive.
+			}
+		},
+		[userId],
+	);
+
+	const handleSortEnd = useCallback(
+		(event: DragEndEvent) => {
+			const { active, over } = event;
+
+			if (!over || active.id === over.id) {
+				return;
+			}
+
+			let nextIds: string[] = [];
+			setSelectedCities((currentCities) => {
+				const oldIndex = currentCities.findIndex((city) => city.location.id === active.id);
+				const newIndex = currentCities.findIndex((city) => city.location.id === over.id);
+
+				if (oldIndex < 0 || newIndex < 0) {
+					return currentCities;
+				}
+
+				const nextCities = arrayMove(currentCities, oldIndex, newIndex);
+				nextIds = nextCities.map((city) => city.location.id);
+				return nextCities;
+			});
+			if (nextIds.length > 0) {
+				void persistLocationList(nextIds);
+			}
+		},
+		[persistLocationList],
+	);
 
 	const updateCityWeather = useCallback(
 		(locationId: string, updater: (city: SelectedCityWeather) => SelectedCityWeather) => {
@@ -246,6 +270,7 @@ export default function CityInput() {
 	const handleAddLocation = useCallback(
 		async (location: LocationInfo) => {
 			let shouldFetch = false;
+			let nextIds: string[] = [];
 
 			setSelectedCities((currentCities) => {
 				const existingCity = currentCities.find((city) => city.location.id === location.id);
@@ -254,7 +279,9 @@ export default function CityInput() {
 				}
 
 				shouldFetch = true;
-				return [...currentCities, { location, loading: true }];
+				const nextCities = [...currentCities, { location, loading: true }];
+				nextIds = nextCities.map((city) => city.location.id);
+				return nextCities;
 			});
 
 			if (!shouldFetch) {
@@ -263,6 +290,9 @@ export default function CityInput() {
 
 			try {
 				await weatherService.saveLocation({ locationId: location.id });
+				if (nextIds.length > 0) {
+					void persistLocationList(nextIds);
+				}
 				const res = await weatherService.getWeatherNow({ location: location.id, lang: weatherApiLang });
 				updateCityWeather(location.id, (city) => ({ ...city, weather: res.now, loading: false, error: undefined }));
 			} catch (error) {
@@ -273,7 +303,7 @@ export default function CityInput() {
 				}));
 			}
 		},
-		[updateCityWeather, weatherApiLang],
+		[persistLocationList, updateCityWeather, weatherApiLang],
 	);
 
 	const refreshAllWeather = useCallback(
@@ -319,17 +349,24 @@ export default function CityInput() {
 			}
 
 			try {
-				const savedPayload = await weatherService.getSavedLocations({ userId });
+				const [savedListRes, savedPayload] = await Promise.all([
+					weatherService.getSavedLocationList(),
+					weatherService.getSavedLocations({ userId }),
+				]);
+				const orderedIds = savedListRes?.data ?? [];
 				const savedIds = [...new Set(normalizeSavedLocationIds(savedPayload))];
+				const finalIds = orderedIds.length
+					? [...orderedIds.filter((id) => savedIds.includes(id)), ...savedIds.filter((id) => !orderedIds.includes(id))]
+					: savedIds;
 
-				if (savedIds.length === 0) {
+				if (finalIds.length === 0) {
 					setSelectedCities([]);
 					setPageLoading(false);
 					return;
 				}
 
 				const cityEntries = await Promise.all(
-					savedIds.map(async (locationId) => {
+					finalIds.map(async (locationId) => {
 						try {
 							const [locationRes, weatherRes] = await Promise.all([
 								weatherService.searchLocation({ locationName: locationId }),
@@ -409,9 +446,15 @@ export default function CityInput() {
 				await weatherService.removeSavedLocation({ userId, locationId });
 			}
 
-			setSelectedCities((currentCities) => currentCities.filter((city) => city.location.id !== locationId));
+			let nextIds: string[] = [];
+			setSelectedCities((currentCities) => {
+				const nextCities = currentCities.filter((city) => city.location.id !== locationId);
+				nextIds = nextCities.map((city) => city.location.id);
+				return nextCities;
+			});
+			void persistLocationList(nextIds);
 		},
-		[userId],
+		[persistLocationList, userId],
 	);
 
 	return (
