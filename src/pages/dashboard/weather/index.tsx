@@ -12,6 +12,7 @@ import { themeVars } from "@/theme/theme.css";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Skeleton } from "@/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/ui/tooltip";
 import { getStringItem } from "@/utils/storage";
 import { rgbAlpha } from "@/utils/theme";
 import SearchBox from "./search-box";
@@ -627,7 +628,7 @@ function SortableCapsule({
 		<div
 			ref={setNodeRef}
 			style={style}
-			className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${isDragging ? "z-10 opacity-80" : ""}`}
+			className={`inline-flex w-[280px] max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${isDragging ? "z-10 opacity-80" : ""}`}
 		>
 			<button
 				type="button"
@@ -639,9 +640,16 @@ function SortableCapsule({
 			>
 				<GripVerticalIcon className="h-4 w-4" />
 			</button>
-			<span className="whitespace-nowrap">
-				{city.location.country}, {city.location.adm1}, {city.location.name}
-			</span>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<span className="min-w-0 flex-1 truncate whitespace-nowrap">
+						{city.location.adm1}, {city.location.name}
+					</span>
+				</TooltipTrigger>
+				<TooltipContent side="top">
+					{city.location.country}, {city.location.adm1}, {city.location.name}
+				</TooltipContent>
+			</Tooltip>
 			<button
 				type="button"
 				onClick={() => onRemove(city.location.id)}
@@ -790,9 +798,9 @@ function SortableWeatherCard({
 function WeatherCapsuleSkeleton() {
 	return (
 		<>
-			<Skeleton className="h-11 w-56 rounded-full border" style={capsuleStyle} />
-			<Skeleton className="h-11 w-64 rounded-full border" style={capsuleStyle} />
-			<Skeleton className="h-11 w-52 rounded-full border" style={capsuleStyle} />
+			<Skeleton className="h-11 w-[280px] max-w-full rounded-full border" style={capsuleStyle} />
+			<Skeleton className="h-11 w-[280px] max-w-full rounded-full border" style={capsuleStyle} />
+			<Skeleton className="h-11 w-[280px] max-w-full rounded-full border" style={capsuleStyle} />
 		</>
 	);
 }
