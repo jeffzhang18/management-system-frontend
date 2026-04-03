@@ -9,14 +9,12 @@
 		"resetText": "重置",
 		"searchText": "搜索",
 		"queryText": "查询",
-
 		"inputText": "请输入",
 		"chooseText": "请选择",
-
 		"redo": "刷新",
 		"back": "返回",
-
+		"more": "更多",
 		"light": "亮色主题",
-		"dark": "黑暗主题"
+		"dark": "暗色主题"
 	}
 }

@@ -1,11 +1,13 @@
+import { faker } from "@faker-js/faker";
+import { useTranslation } from "react-i18next";
 import { Icon } from "@/components/icon";
 import { Badge } from "@/ui/badge";
 import { Button } from "@/ui/button";
 import { Card } from "@/ui/card";
 import { Text } from "@/ui/typography";
-import { faker } from "@faker-js/faker";
 
 export default function ConnectionsTab() {
+	const { t } = useTranslation();
 	const items = [
 		{
 			avatar: faker.image.avatarGitHub(),
@@ -95,7 +97,7 @@ export default function ConnectionsTab() {
 								{item.projects}
 							</Text>
 							<Text variant="body2" className="opacity-60">
-								Projects
+								{t("sys.profile.labels.projects")}
 							</Text>
 						</div>
 						<div className="[ flex flex-col  items-center">
@@ -103,7 +105,7 @@ export default function ConnectionsTab() {
 								{item.tasks}
 							</Text>
 							<Text variant="body2" className="opacity-60">
-								Tasks
+								{t("sys.profile.labels.tasks")}
 							</Text>
 						</div>
 						<div className="[ flex flex-col  items-center">
@@ -111,7 +113,7 @@ export default function ConnectionsTab() {
 								{item.connections}
 							</Text>
 							<Text variant="body2" className="opacity-60">
-								Tasks
+								{t("sys.profile.labels.connections")}
 							</Text>
 						</div>
 					</div>
@@ -120,7 +122,7 @@ export default function ConnectionsTab() {
 						<Button variant={item.connected ? "default" : "outline"}>
 							<Icon icon="ri:user-add-line" size={14} />
 							<Text variant="body2" className="ml-2">
-								CONNECTED
+								{item.connected ? t("sys.profile.actions.connected") : t("sys.profile.actions.connect")}
 							</Text>
 						</Button>
 					</div>

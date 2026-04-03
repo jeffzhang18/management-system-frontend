@@ -8,12 +8,20 @@ export interface UserToken {
 
 export interface UserInfo {
 	id: string;
+	name?: string;
+	gender?: number | null;
 	user_id?: string;
+	user_name?: string;
 	email: string;
 	username: string;
 	// password?: string;
 	avatar?: string;
+	role?: Role | Role[] | string | string[] | null;
 	roles?: Role[];
+	language?: string | null;
+	country?: string | null;
+	contact?: string | null;
+	about?: string | null;
 	status?: BasicStatus;
 	permissions?: Permission[];
 	menu?: MenuTree[];

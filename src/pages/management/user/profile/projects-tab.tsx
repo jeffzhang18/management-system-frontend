@@ -8,8 +8,10 @@ import { Card, CardContent } from "@/ui/card";
 import { Text } from "@/ui/typography";
 import { faker } from "@faker-js/faker";
 import dayjs from "dayjs";
+import { useTranslation } from "react-i18next";
 
 export default function ProjectsTab() {
+	const { t } = useTranslation();
 	const items = [
 		{
 			icon: <Icon icon="logos:react" size={40} />,
@@ -90,7 +92,7 @@ export default function ProjectsTab() {
 									{item.name}
 								</Text>
 								<Text variant="caption" className="ml-4">
-									Client: {item.client}
+									{t("sys.profile.labels.client")}: {item.client}
 								</Text>
 							</div>
 
@@ -104,14 +106,14 @@ export default function ProjectsTab() {
 						<main className="mt-4 w-full">
 							<div className="my-2 flex justify-between">
 								<Text variant="body1">
-									Start Date:
+									{t("sys.profile.labels.startDate")}:
 									<Text variant="caption" className="ml-2">
 										{item.startDate.format("DD/MM/YYYY")}
 									</Text>
 								</Text>
 
 								<Text variant="body1">
-									Deadline:
+									{t("sys.profile.labels.deadline")}:
 									<Text variant="caption" className="ml-2">
 										{item.deadline.format("DD/MM/YYYY")}
 									</Text>
@@ -123,13 +125,15 @@ export default function ProjectsTab() {
 						<footer className="flex w-full  flex-col items-center">
 							<div className="mb-4 flex w-full justify-between">
 								<span>
-									<Text variant="body1">All Hours:</Text>
+									<Text variant="body1">{t("sys.profile.labels.allHours")}:</Text>
 									<Text variant="caption" className="ml-2">
 										{item.allHours}
 									</Text>
 								</span>
 
-								<Badge variant="warning">{item.deadline.diff(dayjs(), "day")} days left</Badge>
+								<Badge variant="warning">
+									{t("sys.profile.labels.daysLeft", { count: item.deadline.diff(dayjs(), "day") })}
+								</Badge>
 							</div>
 							<div className="flex w-full ">
 								<AvatarGroup max={{ count: 3 }} size="small">

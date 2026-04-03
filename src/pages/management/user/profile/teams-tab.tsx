@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { fakeAvatars } from "@/_mock/utils";
 import { Icon } from "@/components/icon";
 import { Avatar, AvatarImage } from "@/ui/avatar";
@@ -6,6 +7,7 @@ import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
 
 export default function TeamsTab() {
+	const { t } = useTranslation();
 	const items = [
 		{
 			icon: <Icon icon="logos:react" size={40} />,
@@ -56,7 +58,7 @@ export default function TeamsTab() {
 								<Button variant="ghost" size="icon">
 									<Icon icon="solar:star-line-duotone" size={18} />
 								</Button>
-								<Button variant="ghost" size="icon">
+								<Button variant="ghost" size="icon" aria-label={t("common.more")}>
 									<Icon icon="fontisto:more-v-a" size={18} />
 								</Button>
 							</div>

@@ -1,103 +1,123 @@
 {
 	"sys": {
 		"api": {
-			"operationSuccess": "操作成功",
-			"operationFailed": "操作失败",
+			"apiRequestFailed": "接口请求失败，请稍后重试。",
+			"apiTimeoutMessage": "接口请求超时，请刷新页面后重试。",
+			"errMsg401": "用户没有权限（令牌、用户名或密码错误）。",
+			"errMsg403": "用户已授权，但禁止访问。",
+			"errMsg404": "网络请求错误，未找到该资源。",
+			"errMsg405": "网络请求错误，请求方法不被允许。",
+			"errMsg408": "网络请求超时。",
+			"errMsg500": "服务器错误，请联系管理员。",
+			"errMsg501": "网络未实现。",
+			"errMsg502": "网络错误。",
+			"errMsg503": "服务不可用，服务器暂时过载或维护中。",
+			"errMsg504": "网络超时。",
+			"errMsg505": "HTTP 版本不支持该请求。",
+			"errorMessage": "操作失败，系统异常。",
 			"errorTip": "错误提示",
-			"successTip": "成功提示",
-			"errorMessage": "操作失败,系统异常!",
-			"timeoutMessage": "登录超时,请重新登录!",
-			"apiTimeoutMessage": "接口请求超时,请刷新页面重试!",
-			"apiRequestFailed": "请求出错，请稍候重试",
 			"networkException": "网络异常",
-			"networkExceptionMsg": "网络异常，请检查您的网络连接是否正常!",
-
-			"errMsg401": "用户没有权限（令牌、用户名、密码错误）!",
-			"errMsg403": "用户得到授权，但是访问是被禁止的。!",
-			"errMsg404": "网络请求错误,未找到该资源!",
-			"errMsg405": "网络请求错误,请求方法未允许!",
-			"errMsg408": "网络请求超时!",
-			"errMsg500": "服务器错误,请联系管理员!",
-			"errMsg501": "网络未实现!",
-			"errMsg502": "网络错误!",
-			"errMsg503": "服务不可用，服务器暂时过载或维护!",
-			"errMsg504": "网络超时!",
-			"errMsg505": "http版本不支持该请求!"
+			"networkExceptionMsg": "请检查网络连接是否正常。",
+			"operationFailed": "操作失败",
+			"operationSuccess": "操作成功",
+			"successTip": "成功提示",
+			"timeoutMessage": "登录超时，请重新登录。"
 		},
+		"docs": "文档",
 		"login": {
-			"backSignIn": "返回",
-			"signInFormTitle": "登录到您的账户",
-			"mobileSignInFormTitle": "手机登录",
-			"qrSignInFormTitle": "二维码登录",
-			"signUpFormTitle": "注册",
+			"accountPlaceholder": "请输入用户名",
+			"backSignIn": "返回登录",
+			"confirmPassword": "确认密码",
+			"confirmPasswordPlaceholder": "请输入确认密码",
+			"diffPwd": "两次输入的密码不一致",
+			"email": "邮箱",
+			"emaildPlaceholder": "请输入邮箱",
+			"forgetFormSecondTitle": "请输入与账户关联的邮箱地址，我们会向你发送重置密码链接。",
 			"forgetFormTitle": "重置密码",
-
-			"signInPrimaryTitle": "欢迎回来",
-			"signInSecondTitle": "开箱即用的中后台管理系统",
-			"signInDesc": "输入您的个人详细信息开始使用！",
-			"policy": "我同意xxx隐私政策",
-			"scanSign": "扫码后点击'确认'，即可完成登录",
-			"forgetFormSecondTitle": "请输入与您的帐户关联的电子邮件地址，我们将通过电子邮件向您发送重置密码的链接。",
-
+			"forgetPassword": "忘记密码？",
 			"loginButton": "登录",
+			"loginSuccessDesc": "欢迎回来",
+			"loginSuccessTitle": "登录成功",
+			"logout": "退出登录",
+			"mobile": "手机号",
+			"mobilePlaceholder": "请输入手机号",
+			"mobileSignInFormTitle": "手机登录",
+			"otherSignIn": "其他登录方式",
+			"password": "密码",
+			"passwordPlaceholder": "请输入密码",
+			"policy": "我同意 xxx 隐私政策",
+			"policyPlaceholder": "勾选后才能注册",
+			"privacyPolicy": "隐私政策",
+			"qrSignInFormTitle": "二维码登录",
+			"registerAndAgree": "注册即表示我同意",
 			"registerButton": "注册",
 			"rememberMe": "记住我",
-			"forgetPassword": "忘记密码?",
-			"otherSignIn": "其他登录方式",
-			"sendSmsButton": "发送验证码",
-			"sendSmsText": "{{second}}秒后重试",
+			"scanSign": "扫码后点击“确认”即可完成登录",
 			"sendEmailButton": "发送邮件",
-
-			"loginSuccessTitle": "登录成功",
-			"loginSuccessDesc": "欢迎回来",
-
-			"accountPlaceholder": "请输入用户名",
-			"passwordPlaceholder": "请输入密码",
-			"confirmPasswordPlaceholder": "请输入确认密码",
-			"emaildPlaceholder": "请输入邮箱",
-			"smsPlaceholder": "请输入验证码",
-			"mobilePlaceholder": "请输入手机号码",
-			"policyPlaceholder": "勾选后才能注册",
-			"diffPwd": "两次输入密码不一致",
-
-			"userName": "用户名",
-			"password": "密码",
-			"confirmPassword": "确认密码",
-			"email": "邮箱",
+			"sendSmsButton": "发送短信验证码",
+			"sendSmsText": "{{second}} 秒后重试",
+			"signInDesc": "输入你的个人信息开始使用。",
+			"signInFormTitle": "登录到你的账户",
+			"signInPrimaryTitle": "欢迎回来",
+			"signInSecondTitle": "后台管理系统",
+			"signInTitle": "",
+			"signUpFormTitle": "注册",
 			"smsCode": "短信验证码",
-			"mobile": "手机号码",
-
-			"registerAndAgree": "注册即我同意",
-			"termsOfService": " 服务条款 ",
-			"privacyPolicy": " 隐私政策 ",
-			"logout": "退出",
-			"signInFormDescription": "输入您的账号登录到您的账户",
-			"noAccount": "没有账号？"
-		},
-		"tab": {
-			"fullscreen": "内容全屏",
-			"refresh": "刷新",
-			"close": "关闭标签页",
-			"closeOthers": "关闭其它标签页",
-			"closeAll": "关闭所有标签页",
-			"closeLeft": "关闭左侧标签页",
-			"closeRight": "关闭右侧标签页"
+			"smsPlaceholder": "请输入短信验证码",
+			"termsOfService": "服务条款",
+			"userName": "用户名",
+			"signInFormDescription": "输入你的账号登录到你的账户",
+			"noAccount": "还没有账号？"
 		},
 		"nav": {
-			"dashboard": "仪表板",
+			"dashboard": "仪表盘",
 			"pages": "页面",
 			"others": "其他",
-			"ui": "UI",
-			"custom_ui_components": "自定义UI组件",
-			"workbench": "工作台",
-			"analysis": "分析",
+			"ui": "界面",
+			"custom_ui_components": "自定义 UI 组件",
+			"analysis": "分析页",
 			"weather": "天气",
-			"management": "管理",
-			"user": {
-				"index": "用户",
-				"profile": "个人资料",
-				"account": "账户"
+			"animate": "动画",
+			"blank": "空白页",
+			"blog": "博客",
+			"calendar": "日历",
+			"chart": "图表",
+			"clipboard": "剪贴板",
+			"components": "组件",
+			"disabled": "禁用项",
+			"editor": "编辑器",
+			"error": {
+				"403": "403",
+				"404": "404",
+				"500": "500",
+				"index": "错误页"
 			},
+			"external_link": "外链",
+			"link": "链接项",
+			"functions": "功能",
+			"i18n": "多语言",
+			"icon": "图标",
+			"iframe": "内嵌页",
+			"kanban": "看板",
+			"label": "标签项",
+			"permission": "权限",
+			"permission.page_test": "页面权限测试",
+			"management": "管理",
+			"markdown": "Markdown",
+			"menulevel": {
+				"1a": "多级菜单 1a",
+				"1b": {
+					"2a": "多级菜单 2a",
+					"2b": {
+						"3a": "多级菜单 3a",
+						"3b": "多级菜单 3b",
+						"index": "多级菜单 2b"
+					},
+					"index": "多级菜单 1b"
+				},
+				"index": "多级菜单"
+			},
+			"scroll": "滚动",
 			"system": {
 				"index": "系统",
 				"organization": "组织",
@@ -106,73 +126,113 @@
 				"user": "用户",
 				"user_detail": "用户详情"
 			},
-			"blog": "博客",
-			"components": "组件",
-			"icon": "图标",
-			"animate": "动画",
-			"scroll": "滚动",
-			"markdown": "Markdown",
-			"editor": "富文本",
-			"i18n": "多语言",
+			"toast": "提示",
+			"token_expired": "令牌失效",
 			"upload": "上传",
-			"chart": "图表",
-			"toast": "Toast",
-			"functions": "功能",
-			"clipboard": "剪贴板",
-			"token_expired": "Token失效",
-			"menulevel": {
-				"index": "多级菜单",
-				"1a": "多级菜单 1a",
-				"1b": {
-					"index": "多级菜单 1b",
-					"2a": "多级菜单 2a",
-					"2b": {
-						"index": "多级菜单 2b",
-						"3a": "多级菜单 3a",
-						"3b": "多级菜单 3b"
-					}
+			"user": {
+				"account": "账户",
+				"index": "用户",
+				"profile": "个人资料"
+			},
+			"workbench": "工作台"
+		},
+		"settings": {
+			"accordion": "手风琴菜单",
+			"breadcrumb": "面包屑",
+			"darkSidebar": "深色侧边栏",
+			"exitFullscreen": "退出全屏",
+			"family": "字体系列",
+			"font": "字体",
+			"fullscreen": "全屏",
+			"layout": "布局",
+			"mode": "模式",
+			"multiTab": "多标签",
+			"page": "页面",
+			"presetThemes": "预设主题",
+			"size": "字号",
+			"stretch": "拉伸",
+			"stretchTip": "仅在屏幕宽度大于 1280px（xl）时可用",
+			"title": "设置"
+		},
+		"profile": {
+			"tabs": {
+				"profile": "资料",
+				"teams": "团队",
+				"projects": "项目",
+				"connections": "关系"
+			},
+			"cards": {
+				"about": "关于",
+				"activityTimeline": "动态时间线",
+				"connections": "关系",
+				"teams": "团队"
+			},
+			"about": {
+				"fullName": "姓名",
+				"role": "角色",
+				"country": "国家",
+				"language": "语言",
+				"contact": "联系方式",
+				"email": "邮箱"
+			},
+			"labels": {
+				"client": "客户",
+				"connections": "关系",
+				"members": "成员",
+				"projects": "项目",
+				"tasks": "任务",
+				"startDate": "开始日期",
+				"deadline": "截止日期",
+				"allHours": "总工时",
+				"daysLeft_one": "剩余 {{count}} 天",
+				"daysLeft_other": "剩余 {{count}} 天"
+			},
+			"actions": {
+				"connected": "已连接",
+				"connect": "连接"
+			},
+			"tags": {
+				"developer": "开发",
+				"designer": "设计",
+				"test": "测试",
+				"marketing": "营销"
+			},
+			"timeline": {
+				"invoicesPaid": {
+					"title": "8 笔发票已支付",
+					"time": "星期三",
+					"description": "发票款项已支付给公司。"
+				},
+				"newProject": {
+					"title": "为客户创建了一个新项目",
+					"time": "4 月 18 日",
+					"description": "新的客户项目已创建并同步给团队。"
+				},
+				"order": {
+					"title": "9 月份的订单 #37745",
+					"time": "1 月 10 日",
+					"description": "订单更新已同步到工作区。"
+				},
+				"meeting": {
+					"title": "公开会议",
+					"time": "9 月 30 日"
 				}
 			},
-			"disabled": "项目禁用",
-			"label": "项目标签",
-			"link": "链接",
-			"external_link": "外链",
-			"iframe": "内嵌",
-			"blank": "空白",
-			"calendar": "日历",
-			"kanban": "看板",
-			"permission": "权限",
-			"permission.page_test": "页面鉴权测试",
-			"error": {
-				"index": "异常页",
-				"403": "403",
-				"404": "404",
-				"500": "500"
-			}
+			"emptyAbout": "暂未填写个人简介。"
 		},
-		"docs": "文档",
-		"settings": {
-			"title": "设置",
-			"mode": "模式",
-			"layout": "布局",
-			"stretch": "拉伸",
-			"stretchTip": "仅在屏幕宽度大于 1280px 时可用(xl)",
-			"presetThemes": "预设",
-			"font": "字体",
-			"family": "字体系列",
-			"size": "字体大小",
-			"page": "页面",
-			"breadcrumb": "面包屑",
-			"multiTab": "多标签",
-			"darkSidebar": "暗色侧边栏",
-			"accordion": "手风琴菜单",
+		"tab": {
+			"close": "关闭",
+			"closeAll": "关闭全部",
+			"closeLeft": "关闭左侧",
+			"closeOthers": "关闭其他",
+			"closeRight": "关闭右侧",
 			"fullscreen": "全屏",
-			"exitFullscreen": "退出全屏"
+			"refresh": "刷新"
 		},
 		"weather": {
-			"whichCityPlaceHolder": "请输入城市~",
+			"whichCityPlaceHolder": "请输入城市",
 			"noMatchedCity": "没有匹配的城市",
-			"pageDescription": "搜索并选择城市后，可将城市固定为可拖拽排序的天气卡片。",
+			"pageDescription": "搜索并选择城市，将其固定为可拖拽排序的天气卡片。",
 			"noCitySelected": "暂未选择城市",
 			"emptyCardHint": "选择城市后，这里会显示对应的天气卡片。",
 			"feelsLike": "体感温度",
@@ -181,12 +241,12 @@
 			"pressure": "气压",
 			"windDirection": "风向",
 			"liveWeather": "实时天气",
-			"currentWeatherInfo": "已为你展示当前天气信息",
+			"currentWeatherInfo": "当前天气详情显示在这里。",
 			"loadFailed": "天气加载失败",
-			"dragCity": "拖动{{city}}",
-			"removeCity": "删除{{city}}",
-			"dragCard": "拖动{{city}}天气卡片",
-			"noData": "暂无"
+			"dragCity": "拖动 {{city}}",
+			"removeCity": "移除 {{city}}",
+			"dragCard": "拖动 {{city}} 的天气卡片",
+			"noData": "暂无数据"
 		}
 	}
 }

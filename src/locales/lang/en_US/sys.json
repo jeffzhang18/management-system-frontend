@@ -154,6 +154,72 @@
 			"stretchTip": "Only available when the screen width is greater than 1280px (xl)",
 			"title": "Settings"
 		},
+		"profile": {
+			"tabs": {
+				"profile": "Profile",
+				"teams": "Teams",
+				"projects": "Projects",
+				"connections": "Connections"
+			},
+			"cards": {
+				"about": "About",
+				"activityTimeline": "Activity Timeline",
+				"connections": "Connections",
+				"teams": "Teams"
+			},
+			"about": {
+				"fullName": "Full Name",
+				"role": "Role",
+				"country": "Country",
+				"language": "Language",
+				"contact": "Contact",
+				"email": "Email"
+			},
+			"labels": {
+				"client": "client",
+				"connections": "Connections",
+				"members": "Members",
+				"projects": "Projects",
+				"tasks": "Tasks",
+				"startDate": "Start Date",
+				"deadline": "Deadline",
+				"allHours": "All Hours",
+				"daysLeft_one": "{{count}} day left",
+				"daysLeft_other": "{{count}} days left"
+			},
+			"actions": {
+				"connected": "CONNECTED",
+				"connect": "CONNECT"
+			},
+			"tags": {
+				"developer": "Developer",
+				"designer": "Designer",
+				"test": "Test",
+				"marketing": "Marketing"
+			},
+			"timeline": {
+				"invoicesPaid": {
+					"title": "8 invoices have been paid",
+					"time": "Wednesday",
+					"description": "Invoices have been paid to the company."
+				},
+				"newProject": {
+					"title": "Create a new project for the client",
+					"time": "April, 18",
+					"description": "A new client project has been created and shared with the team."
+				},
+				"order": {
+					"title": "Order #37745 from September",
+					"time": "January, 10",
+					"description": "The order update has been synchronized to the workspace."
+				},
+				"meeting": {
+					"title": "Public Meeting",
+					"time": "September, 30"
+				}
+			},
+			"emptyAbout": "No personal description yet."
+		},
 		"tab": {
 			"close": "Close",
 			"closeAll": "Close All",

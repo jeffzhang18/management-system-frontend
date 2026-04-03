@@ -1,9 +1,28 @@
-import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import {
+	closestCenter,
+	DndContext,
+	type DragCancelEvent,
+	type DragEndEvent,
+	type DragOverEvent,
+	DragOverlay,
+	type DragStartEvent,
+	PointerSensor,
+	useSensor,
+	useSensors,
+} from "@dnd-kit/core";
 import { arrayMove, rectSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { TFunction } from "i18next";
 import { GripVerticalIcon, RotateCwIcon, XIcon } from "lucide-react";
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	type ButtonHTMLAttributes,
+	type CSSProperties,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { LocalEnum, StorageEnum } from "#/enum";
 import type { LocationInfo, SavedLocationItem, WeatherNowInfo } from "@/api/services/weatherService";
@@ -96,6 +115,7 @@ const dragHandleStyle = {
 	color: themeVars.colors.palette.primary.default,
 	border: `1px solid ${rgbAlpha(palette.defaultChannel, 0.12)}`,
 };
+const capsuleTransition = "transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 180ms ease, box-shadow 180ms ease";
 
 function getWeatherImage(weather?: WeatherNowInfo) {
 	const text = (weather?.text || "").trim().toLowerCase();
@@ -205,14 +225,28 @@ export default function CityInput() {
 	const [pageLoading, setPageLoading] = useState(true);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [visibleCardCount, setVisibleCardCount] = useState(0);
+	const [activeCapsuleId, setActiveCapsuleId] = useState<string | null>(null);
+	const [capsulePreviewCities, setCapsulePreviewCities] = useState<SelectedCityWeather[] | null>(null);
 	const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 	const cityIds = useMemo(() => selectedCities.map((city) => city.location.id), [selectedCities]);
+	const capsuleCities = useMemo(() => capsulePreviewCities ?? selectedCities, [capsulePreviewCities, selectedCities]);
+	const capsuleCityIds = useMemo(() => capsuleCities.map((city) => city.location.id), [capsuleCities]);
 	const visibleCityIds = useMemo(() => cityIds.slice(0, visibleCardCount), [cityIds, visibleCardCount]);
 	const visibleCities = useMemo(() => selectedCities.slice(0, visibleCardCount), [selectedCities, visibleCardCount]);
+	const activeCapsule = useMemo(
+		() => (activeCapsuleId ? (capsuleCities.find((city) => city.location.id === activeCapsuleId) ?? null) : null),
+		[activeCapsuleId, capsuleCities],
+	);
 	const weatherMeta = useMemo(() => getWeatherMeta(t), [t]);
 	const cityIdsRef = useRef<string[]>([]);
+	const capsulePreviewCitiesRef = useRef<SelectedCityWeather[] | null>(null);
+	const capsulePreviewFrameRef = useRef<number | null>(null);
+	const capsulePreviewEnabledRef = useRef(true);
+	const capsuleDragBurstCountRef = useRef(0);
+	const capsuleDragBurstTimestampRef = useRef(0);
 	const visibleCardCountRef = useRef(0);
 	const loadingMoreRef = useRef(false);
+	const lastCapsuleOverIdRef = useRef<string | null>(null);
 	const initializedLanguageRef = useRef(false);
 	const prevWeatherApiLangRef = useRef(weatherApiLang);
 	const loadFailedTextRef = useRef(t("sys.weather.loadFailed"));
@@ -221,6 +255,19 @@ export default function CityInput() {
 	useEffect(() => {
 		loadFailedTextRef.current = t("sys.weather.loadFailed");
 	}, [t]);
+
+	useEffect(() => {
+		capsulePreviewCitiesRef.current = capsulePreviewCities;
+	}, [capsulePreviewCities]);
+
+	useEffect(
+		() => () => {
+			if (capsulePreviewFrameRef.current !== null) {
+				cancelAnimationFrame(capsulePreviewFrameRef.current);
+			}
+		},
+		[],
+	);
 
 	const updateCityWeather = useCallback(
 		(locationId: string, updater: (city: SelectedCityWeather) => SelectedCityWeather) => {
@@ -347,22 +394,8 @@ export default function CityInput() {
 		[updateCityWeather],
 	);
 
-	const handleSortEnd = useCallback(
-		(event: DragEndEvent) => {
-			const { active, over } = event;
-
-			if (!over || active.id === over.id) {
-				return;
-			}
-
-			const oldIndex = selectedCities.findIndex((city) => city.location.id === active.id);
-			const newIndex = selectedCities.findIndex((city) => city.location.id === over.id);
-
-			if (oldIndex < 0 || newIndex < 0) {
-				return;
-			}
-
-			const sortedCities = arrayMove(selectedCities, oldIndex, newIndex);
+	const commitSortedCities = useCallback(
+		(sortedCities: SelectedCityWeather[]) => {
 			const sortedIds = sortedCities.map((city) => city.location.id);
 			const frontVisibleIds = sortedIds.slice(0, visibleCardCountRef.current);
 			const frontSet = new Set(frontVisibleIds);
@@ -383,10 +416,161 @@ export default function CityInput() {
 			}
 
 			if (sortedIds.length > 0) {
+				cityIdsRef.current = sortedIds;
 				void weatherService.saveLocationList({ locationList: sortedIds });
 			}
 		},
-		[fetchWeatherForIds, selectedCities, weatherApiLang],
+		[fetchWeatherForIds, weatherApiLang],
+	);
+
+	const handleSortEnd = useCallback(
+		(event: DragEndEvent) => {
+			const { active, over } = event;
+
+			if (!over || active.id === over.id) {
+				return;
+			}
+
+			const oldIndex = selectedCities.findIndex((city) => city.location.id === active.id);
+			const newIndex = selectedCities.findIndex((city) => city.location.id === over.id);
+
+			if (oldIndex < 0 || newIndex < 0) {
+				return;
+			}
+
+			commitSortedCities(arrayMove(selectedCities, oldIndex, newIndex));
+		},
+		[commitSortedCities, selectedCities],
+	);
+
+	const handleCapsuleDragStart = useCallback(
+		(event: DragStartEvent) => {
+			const nextPreviewCities = selectedCities;
+			setActiveCapsuleId(String(event.active.id));
+			capsulePreviewCitiesRef.current = nextPreviewCities;
+			setCapsulePreviewCities(nextPreviewCities);
+			capsulePreviewEnabledRef.current = true;
+			capsuleDragBurstCountRef.current = 0;
+			capsuleDragBurstTimestampRef.current = 0;
+			lastCapsuleOverIdRef.current = null;
+		},
+		[selectedCities],
+	);
+
+	const handleCapsuleDragOver = useCallback((event: DragOverEvent) => {
+		const { active, over } = event;
+
+		if (!over) {
+			return;
+		}
+
+		const activeId = String(active.id);
+		const overId = String(over.id);
+
+		if (!capsulePreviewEnabledRef.current) {
+			return;
+		}
+
+		const now = performance.now();
+		if (now - capsuleDragBurstTimestampRef.current < 180) {
+			capsuleDragBurstCountRef.current += 1;
+		} else {
+			capsuleDragBurstCountRef.current = 1;
+		}
+		capsuleDragBurstTimestampRef.current = now;
+
+		if (capsuleDragBurstCountRef.current > 18) {
+			capsulePreviewEnabledRef.current = false;
+			lastCapsuleOverIdRef.current = null;
+			capsulePreviewCitiesRef.current = null;
+
+			if (capsulePreviewFrameRef.current !== null) {
+				cancelAnimationFrame(capsulePreviewFrameRef.current);
+				capsulePreviewFrameRef.current = null;
+			}
+
+			setCapsulePreviewCities(null);
+			return;
+		}
+
+		if (activeId === overId || lastCapsuleOverIdRef.current === overId) {
+			return;
+		}
+
+		const currentCities = capsulePreviewCitiesRef.current;
+		if (!currentCities) {
+			return;
+		}
+
+		const oldIndex = currentCities.findIndex((city) => city.location.id === activeId);
+		const newIndex = currentCities.findIndex((city) => city.location.id === overId);
+
+		if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) {
+			return;
+		}
+
+		const nextCities = arrayMove(currentCities, oldIndex, newIndex);
+		lastCapsuleOverIdRef.current = overId;
+		capsulePreviewCitiesRef.current = nextCities;
+
+		if (capsulePreviewFrameRef.current !== null) {
+			cancelAnimationFrame(capsulePreviewFrameRef.current);
+		}
+
+		capsulePreviewFrameRef.current = requestAnimationFrame(() => {
+			capsulePreviewFrameRef.current = null;
+			setCapsulePreviewCities(nextCities);
+		});
+	}, []);
+
+	const resetCapsuleDrag = useCallback(() => {
+		if (capsulePreviewFrameRef.current !== null) {
+			cancelAnimationFrame(capsulePreviewFrameRef.current);
+			capsulePreviewFrameRef.current = null;
+		}
+
+		capsulePreviewEnabledRef.current = true;
+		capsuleDragBurstCountRef.current = 0;
+		capsuleDragBurstTimestampRef.current = 0;
+		setActiveCapsuleId(null);
+		capsulePreviewCitiesRef.current = null;
+		setCapsulePreviewCities(null);
+		lastCapsuleOverIdRef.current = null;
+	}, []);
+
+	const handleCapsuleDragCancel = useCallback(
+		(_event: DragCancelEvent) => {
+			resetCapsuleDrag();
+		},
+		[resetCapsuleDrag],
+	);
+
+	const handleCapsuleDragEnd = useCallback(
+		(event: DragEndEvent) => {
+			const { over } = event;
+			const previewCities = capsulePreviewCities;
+			const previewEnabled = capsulePreviewEnabledRef.current;
+			resetCapsuleDrag();
+
+			if (!over) {
+				return;
+			}
+
+			if (!previewEnabled || !previewCities) {
+				handleSortEnd(event);
+				return;
+			}
+
+			const currentIds = selectedCities.map((city) => city.location.id);
+			const previewIds = previewCities.map((city) => city.location.id);
+
+			if (currentIds.join("|") === previewIds.join("|")) {
+				return;
+			}
+
+			commitSortedCities(previewCities);
+		},
+		[capsulePreviewCities, commitSortedCities, handleSortEnd, resetCapsuleDrag, selectedCities],
 	);
 
 	const loadSavedLocations = useCallback(
@@ -556,14 +740,27 @@ export default function CityInput() {
 				<SearchBox onSelectLocation={handleAddLocation} />
 			</div>
 
-			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortEnd}>
-				<SortableContext items={cityIds} strategy={rectSortingStrategy}>
+			<DndContext
+				sensors={sensors}
+				collisionDetection={closestCenter}
+				onDragStart={handleCapsuleDragStart}
+				onDragOver={handleCapsuleDragOver}
+				onDragEnd={handleCapsuleDragEnd}
+				onDragCancel={handleCapsuleDragCancel}
+			>
+				<SortableContext items={capsuleCityIds} strategy={rectSortingStrategy}>
 					<div className="flex flex-wrap gap-3">
 						{pageLoading ? (
 							<WeatherCapsuleSkeleton />
-						) : selectedCities.length > 0 ? (
-							selectedCities.map((city) => (
-								<SortableCapsule key={city.location.id} city={city} onRemove={handleRemoveLocation} t={t} />
+						) : capsuleCities.length > 0 ? (
+							capsuleCities.map((city) => (
+								<SortableCapsule
+									key={city.location.id}
+									city={city}
+									onRemove={handleRemoveLocation}
+									t={t}
+									hideWhileDragging={city.location.id === activeCapsuleId}
+								/>
 							))
 						) : (
 							<div className="rounded-full border border-dashed px-4 py-2 text-sm text-muted-foreground">
@@ -572,6 +769,9 @@ export default function CityInput() {
 						)}
 					</div>
 				</SortableContext>
+				<DragOverlay>
+					{activeCapsule ? <CapsuleChip city={activeCapsule} onRemove={() => {}} t={t} isOverlay /> : null}
+				</DragOverlay>
 			</DndContext>
 
 			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleSortEnd}>
@@ -605,43 +805,39 @@ export default function CityInput() {
 	);
 }
 
-function SortableCapsule({
+function CapsuleChip({
 	city,
 	onRemove,
 	t,
+	handleProps,
+	className,
+	isOverlay = false,
 }: {
 	city: SelectedCityWeather;
 	onRemove: (locationId: string) => void;
 	t: TFunction;
+	handleProps?: ButtonHTMLAttributes<HTMLButtonElement>;
+	className?: string;
+	isOverlay?: boolean;
 }) {
-	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-		id: city.location.id,
-	});
-	const style: CSSProperties = {
-		transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-		transition,
-		...capsuleStyle,
-	};
+	const fullLocationName = `${city.location.country}, ${city.location.adm1}, ${city.location.name}`;
 
 	return (
 		<div
-			ref={setNodeRef}
-			style={style}
-			className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${isDragging ? "z-10 opacity-80" : ""}`}
+			style={capsuleStyle}
+			className={`inline-flex w-[320px] max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${className ?? ""}`}
+			title={fullLocationName}
 		>
 			<button
 				type="button"
 				style={capsuleHandleStyle}
-				className="inline-flex h-7 w-7 cursor-grab items-center justify-center rounded-full active:cursor-grabbing"
+				className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${isOverlay ? "cursor-grabbing" : "cursor-grab active:cursor-grabbing"}`}
 				aria-label={t("sys.weather.dragCity", { city: city.location.name })}
-				{...attributes}
-				{...listeners}
+				{...(handleProps ?? {})}
 			>
 				<GripVerticalIcon className="h-4 w-4" />
 			</button>
-			<span className="whitespace-nowrap">
-				{city.location.country}, {city.location.adm1}, {city.location.name}
-			</span>
+			<span className="min-w-0 flex-1 truncate whitespace-nowrap">{fullLocationName}</span>
 			<button
 				type="button"
 				onClick={() => onRemove(city.location.id)}
@@ -651,6 +847,44 @@ function SortableCapsule({
 			>
 				<XIcon className="h-3.5 w-3.5" />
 			</button>
+		</div>
+	);
+}
+
+function SortableCapsule({
+	city,
+	onRemove,
+	t,
+	hideWhileDragging = false,
+}: {
+	city: SelectedCityWeather;
+	onRemove: (locationId: string) => void;
+	t: TFunction;
+	hideWhileDragging?: boolean;
+}) {
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+		id: city.location.id,
+	});
+	const style: CSSProperties = {
+		transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+		transition: transition ? capsuleTransition : undefined,
+	};
+
+	return (
+		<div ref={setNodeRef} style={style}>
+			<CapsuleChip
+				city={city}
+				onRemove={onRemove}
+				t={t}
+				handleProps={{ ...attributes, ...listeners }}
+				className={
+					isDragging && hideWhileDragging
+						? "opacity-0"
+						: isDragging
+							? "z-10 opacity-80 shadow-md"
+							: "transition-shadow duration-200 ease-out"
+				}
+			/>
 		</div>
 	);
 }
