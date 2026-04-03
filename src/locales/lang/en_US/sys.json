@@ -220,6 +220,66 @@
 			},
 			"emptyAbout": "No personal description yet."
 		},
+		"account": {
+			"tabs": {
+				"general": "General",
+				"notifications": "Notifications",
+				"security": "Security"
+			},
+			"actions": {
+				"saveChanges": "Save Changes"
+			},
+			"messages": {
+				"updateSuccess": "Update success!",
+				"missingUser": "Unable to identify the current user. Please sign in again."
+			},
+			"general": {
+				"publicProfile": "Public Profile",
+				"deleteUser": "Delete User",
+				"fields": {
+					"username": "Username",
+					"email": "Email",
+					"phone": "Phone",
+					"address": "Address",
+					"city": "City",
+					"code": "Code",
+					"about": "About"
+				}
+			},
+			"notifications": {
+				"activity": {
+					"title": "Activity",
+					"description": "Manage activity related email notifications.",
+					"items": {
+						"formAnswer": "Email me when someone answers on my form",
+						"articleComment": "Email me when someone comments on my article",
+						"newFollower": "Email me when someone follows me"
+					}
+				},
+				"applications": {
+					"title": "Applications",
+					"description": "Manage updates from product and content channels.",
+					"items": {
+						"news": "News and announcements",
+						"productUpdates": "Weekly product updates",
+						"blogDigest": "Weekly blog digest"
+					}
+				}
+			},
+			"security": {
+				"fields": {
+					"oldPassword": "Old Password",
+					"newPassword": "New Password",
+					"confirmPassword": "Confirm New Password"
+				},
+				"validation": {
+					"oldPasswordRequired": "Old password is required",
+					"newPasswordRequired": "New password is required",
+					"confirmPasswordRequired": "Please confirm your new password",
+					"passwordNotMatch": "Passwords do not match"
+				}
+			}
+		},
 		"tab": {
 			"close": "Close",
 			"closeAll": "Close All",

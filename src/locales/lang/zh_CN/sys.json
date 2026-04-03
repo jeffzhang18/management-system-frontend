@@ -220,6 +220,66 @@
 			},
 			"emptyAbout": "暂未填写个人简介。"
 		},
+		"account": {
+			"tabs": {
+				"general": "通用",
+				"notifications": "通知",
+				"security": "安全"
+			},
+			"actions": {
+				"saveChanges": "保存更改"
+			},
+			"messages": {
+				"updateSuccess": "更新成功！",
+				"missingUser": "无法识别当前用户，请重新登录。"
+			},
+			"general": {
+				"publicProfile": "公开资料",
+				"deleteUser": "删除用户",
+				"fields": {
+					"username": "用户名",
+					"email": "邮箱",
+					"phone": "手机号",
+					"address": "地址",
+					"city": "城市",
+					"code": "邮编",
+					"about": "个人简介"
+				}
+			},
+			"notifications": {
+				"activity": {
+					"title": "动态通知",
+					"description": "管理与动态相关的邮件通知。",
+					"items": {
+						"formAnswer": "当有人回复我的表单时发送邮件",
+						"articleComment": "当有人评论我的文章时发送邮件",
+						"newFollower": "当有人关注我时发送邮件"
+					}
+				},
+				"applications": {
+					"title": "应用通知",
+					"description": "管理产品与内容渠道的更新通知。",
+					"items": {
+						"news": "新闻与公告",
+						"productUpdates": "每周产品更新",
+						"blogDigest": "每周博客摘要"
+					}
+				}
+			},
+			"security": {
+				"fields": {
+					"oldPassword": "旧密码",
+					"newPassword": "新密码",
+					"confirmPassword": "确认新密码"
+				},
+				"validation": {
+					"oldPasswordRequired": "请输入旧密码",
+					"newPasswordRequired": "请输入新密码",
+					"confirmPasswordRequired": "请确认新密码",
+					"passwordNotMatch": "两次输入的密码不一致"
+				}
+			}
+		},
 		"tab": {
 			"close": "关闭",
 			"closeAll": "关闭全部",

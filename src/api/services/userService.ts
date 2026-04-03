@@ -24,11 +24,14 @@ export enum UserApi {
 const signin = (data: SignInReq) => apiClient.post<SignInRes>({ url: UserApi.SignIn, data });
 const signup = (data: SignUpReq) => apiClient.post<SignInRes>({ url: UserApi.SignUp, data });
 const logout = () => apiClient.get({ url: UserApi.Logout });
-const findById = (id: string) => apiClient.get<UserInfo[]>({ url: `${UserApi.User}/${id}` });
+const findById = (id: string) => apiClient.get<UserInfo | UserInfo[]>({ url: `${UserApi.User}/${id}` });
+const updateById = (id: string, data: Partial<UserInfo> & Record<string, unknown>) =>
+	apiClient.put<UserInfo>({ url: `${UserApi.User}/${id}`, data });
 
 export default {
 	signin,
 	signup,
 	findById,
+	updateById,
 	logout,
 };

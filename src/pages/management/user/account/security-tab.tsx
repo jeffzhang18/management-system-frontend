@@ -1,9 +1,10 @@
+import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "@/ui/button";
 import { Card, CardContent } from "@/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/ui/form";
 import { Input } from "@/ui/input";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 
 type FieldType = {
 	oldPassword: string;
@@ -12,6 +13,8 @@ type FieldType = {
 };
 
 export default function SecurityTab() {
+	const { t } = useTranslation();
+
 	const form = useForm<FieldType>({
 		defaultValues: {
 			oldPassword: "",
@@ -22,7 +25,7 @@ export default function SecurityTab() {
 
 	const handleSubmit = () => {
 		// Handle form submission here
-		toast.success("Update success!");
+		toast.success(t("sys.account.messages.updateSuccess"));
 	};
 
 	return (
@@ -33,10 +36,10 @@ export default function SecurityTab() {
 						<FormField
 							control={form.control}
 							name="oldPassword"
-							rules={{ required: "Old password is required" }}
+							rules={{ required: t("sys.account.security.validation.oldPasswordRequired") }}
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Old Password</FormLabel>
+									<FormLabel>{t("sys.account.security.fields.oldPassword")}</FormLabel>
 									<FormControl>
 										<Input type="password" {...field} />
 									</FormControl>
@@ -48,10 +51,10 @@ export default function SecurityTab() {
 						<FormField
 							control={form.control}
 							name="newPassword"
-							rules={{ required: "New password is required" }}
+							rules={{ required: t("sys.account.security.validation.newPasswordRequired") }}
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>New Password</FormLabel>
+									<FormLabel>{t("sys.account.security.fields.newPassword")}</FormLabel>
 									<FormControl>
 										<Input type="password" {...field} />
 									</FormControl>
@@ -64,12 +67,13 @@ export default function SecurityTab() {
 							control={form.control}
 							name="confirmPassword"
 							rules={{
-								required: "Please confirm your new password",
-								validate: (value) => value === form.getValues("newPassword") || "Passwords do not match",
+								required: t("sys.account.security.validation.confirmPasswordRequired"),
+								validate: (value) =>
+									value === form.getValues("newPassword") || t("sys.account.security.validation.passwordNotMatch"),
 							}}
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Confirm New Password</FormLabel>
+									<FormLabel>{t("sys.account.security.fields.confirmPassword")}</FormLabel>
 									<FormControl>
 										<Input type="password" {...field} />
 									</FormControl>
@@ -79,7 +83,7 @@ export default function SecurityTab() {
 						/>
 
 						<div className="flex w-full justify-end">
-							<Button type="submit">Save Changes</Button>
+							<Button type="submit">{t("sys.account.actions.saveChanges")}</Button>
 						</div>
 					</form>
 				</Form>
