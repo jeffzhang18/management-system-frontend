@@ -1,8 +1,8 @@
-import Logo from "@/assets/icons/ic-logo-badge.svg";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { Helmet, HelmetProvider } from "react-helmet-async";
+import Logo from "@/assets/icons/ic-logo-badge.svg";
+import UserBrowsingTracker from "./components/analytics/user-browsing-tracker";
 import { MotionLazy } from "./components/animate/motion-lazy";
 import { RouteLoadingProgress } from "./components/loading";
 import Toast from "./components/toast";
@@ -31,6 +31,7 @@ function App({ children }: { children: React.ReactNode }) {
 						<title>{GLOBAL_CONFIG.appName}</title>
 						<link rel="icon" href={Logo} />
 					</Helmet>
+					<UserBrowsingTracker />
 					<Toast />
 					<RouteLoadingProgress />
 					<MotionLazy>{children}</MotionLazy>

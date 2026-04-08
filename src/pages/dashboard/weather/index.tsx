@@ -820,12 +820,12 @@ function CapsuleChip({
 	className?: string;
 	isOverlay?: boolean;
 }) {
-	const fullLocationName = `${city.location.country}, ${city.location.adm1}, ${city.location.name}`;
+	const fullLocationName = `${city.location.adm1}, ${city.location.name}`;
 
 	return (
 		<div
 			style={capsuleStyle}
-			className={`inline-flex w-[320px] max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${className ?? ""}`}
+			className={`inline-flex w-[240px] max-w-full items-center gap-2 rounded-full border px-3 py-2 text-sm shadow-sm ${className ?? ""}`}
 			title={fullLocationName}
 		>
 			<button
