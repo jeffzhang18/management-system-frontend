@@ -1,9 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import type { UserInfo } from "#/entity";
-import { StorageEnum } from "#/enum";
 import userService from "@/api/services/userService";
 import { UploadAvatar } from "@/components/upload";
 import { useUserActions, useUserInfo } from "@/store/userStore";
@@ -16,12 +15,9 @@ import { Textarea } from "@/ui/textarea";
 import { Text } from "@/ui/typography";
 
 type FieldType = {
-	name?: string;
-	email?: string;
+	userName?: string;
 	phone?: string;
-	address?: string;
 	city?: string;
-	code?: string;
 	about: string;
 };
 
@@ -29,61 +25,44 @@ export default function GeneralTab() {
 	const { t } = useTranslation();
 	const userInfo = useUserInfo();
 	const { setUserInfo } = useUserActions();
-	const { avatar, username, email } = userInfo;
-
-	const currentUserId = useMemo(
-		() => userInfo.user_id || localStorage.getItem(StorageEnum.UserId) || userInfo.id || "",
-		[userInfo.id, userInfo.user_id],
-	);
+	const { avatar, username } = userInfo;
 
 	const form = useForm<FieldType>({
 		defaultValues: {
-			name: username || "",
-			email: email || "",
+			userName: username || "",
 			phone: userInfo.contact || "",
-			address: "",
 			city: userInfo.country || "",
-			code: "",
 			about: userInfo.about || "",
 		},
 	});
 
 	useEffect(() => {
 		form.reset({
-			name: userInfo.name || userInfo.username || "",
-			email: userInfo.email || "",
+			userName: userInfo.username || userInfo.user_name || "",
 			phone: userInfo.contact || "",
-			address: "",
 			city: userInfo.country || "",
-			code: "",
 			about: userInfo.about || "",
 		});
-	}, [form, userInfo.about, userInfo.contact, userInfo.country, userInfo.email, userInfo.name, userInfo.username]);
+	}, [form, userInfo.about, userInfo.contact, userInfo.country, userInfo.user_name, userInfo.username]);
 
 	const handleSubmit = async (values: FieldType) => {
-		if (!currentUserId) {
-			toast.error(t("sys.account.messages.missingUser"));
-			return;
-		}
-
 		try {
-			await userService.updateById(currentUserId, {
-				name: values.name,
-				email: values.email,
+			const profile = await userService.updateProfile({
+				userName: values.userName,
 				contact: values.phone,
 				country: values.city,
 				about: values.about,
-				address: values.address,
-				code: values.code,
+				avatar,
 			});
 
 			setUserInfo({
 				...userInfo,
-				name: values.name,
-				email: values.email,
-				contact: values.phone,
-				country: values.city,
-				about: values.about,
+				...profile,
+				username: profile?.username ?? values.userName ?? userInfo.username,
+				user_name: profile?.user_name ?? values.userName ?? userInfo.user_name,
+				contact: profile?.contact ?? values.phone,
+				country: profile?.country ?? values.city,
+				about: profile?.about ?? values.about,
 			} as UserInfo);
 			toast.success(t("sys.account.messages.updateSuccess"));
 		} catch {}
@@ -113,22 +92,10 @@ export default function GeneralTab() {
 								<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 									<FormField
 										control={form.control}
-										name="name"
+										name="userName"
 										render={({ field }) => (
 											<FormItem>
 												<FormLabel>{t("sys.account.general.fields.username")}</FormLabel>
-												<FormControl>
-													<Input {...field} />
-												</FormControl>
-											</FormItem>
-										)}
-									/>
-									<FormField
-										control={form.control}
-										name="email"
-										render={({ field }) => (
-											<FormItem>
-												<FormLabel>{t("sys.account.general.fields.email")}</FormLabel>
 												<FormControl>
 													<Input {...field} />
 												</FormControl>
@@ -149,34 +116,10 @@ export default function GeneralTab() {
 									/>
 									<FormField
 										control={form.control}
-										name="address"
-										render={({ field }) => (
-											<FormItem>
-												<FormLabel>{t("sys.account.general.fields.address")}</FormLabel>
-												<FormControl>
-													<Input {...field} />
-												</FormControl>
-											</FormItem>
-										)}
-									/>
-									<FormField
-										control={form.control}
 										name="city"
 										render={({ field }) => (
 											<FormItem>
 												<FormLabel>{t("sys.account.general.fields.city")}</FormLabel>
-												<FormControl>
-													<Input {...field} />
-												</FormControl>
-											</FormItem>
-										)}
-									/>
-									<FormField
-										control={form.control}
-										name="code"
-										render={({ field }) => (
-											<FormItem>
-												<FormLabel>{t("sys.account.general.fields.code")}</FormLabel>
 												<FormControl>
 													<Input {...field} />
 												</FormControl>
