@@ -11,7 +11,7 @@ import { Text } from "@/ui/typography";
 
 export default function ProfileTab() {
 	const { t } = useTranslation();
-	const { name, username, email, about, country, language, contact, roles } = useUserInfo();
+	const { name, username, email, about, country, city, language, contact, roles } = useUserInfo();
 	const displayName = name || username || email || "-";
 	const displayRole =
 		roles
@@ -35,6 +35,11 @@ export default function ProfileTab() {
 			icon: <Icon icon="tabler:location-filled" size={18} />,
 			label: t("sys.profile.about.country"),
 			val: country || "-",
+		},
+		{
+			icon: <Icon icon="tabler:map-pin-filled" size={18} />,
+			label: t("sys.profile.about.city"),
+			val: city || "-",
 		},
 		{
 			icon: <Icon icon="ion:language" size={18} />,

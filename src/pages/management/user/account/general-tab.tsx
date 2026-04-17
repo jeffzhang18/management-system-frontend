@@ -17,6 +17,7 @@ import { Text } from "@/ui/typography";
 type FieldType = {
 	userName?: string;
 	phone?: string;
+	country?: string;
 	city?: string;
 	about: string;
 };
@@ -31,7 +32,8 @@ export default function GeneralTab() {
 		defaultValues: {
 			userName: username || "",
 			phone: userInfo.contact || "",
-			city: userInfo.country || "",
+			country: userInfo.country || "",
+			city: userInfo.city || "",
 			about: userInfo.about || "",
 		},
 	});
@@ -40,17 +42,19 @@ export default function GeneralTab() {
 		form.reset({
 			userName: userInfo.username || userInfo.user_name || "",
 			phone: userInfo.contact || "",
-			city: userInfo.country || "",
+			country: userInfo.country || "",
+			city: userInfo.city || "",
 			about: userInfo.about || "",
 		});
-	}, [form, userInfo.about, userInfo.contact, userInfo.country, userInfo.user_name, userInfo.username]);
+	}, [form, userInfo.about, userInfo.city, userInfo.contact, userInfo.country, userInfo.user_name, userInfo.username]);
 
 	const handleSubmit = async (values: FieldType) => {
 		try {
 			const profile = await userService.updateProfile({
 				userName: values.userName,
 				contact: values.phone,
-				country: values.city,
+				country: values.country,
+				city: values.city,
 				about: values.about,
 				avatar,
 			});
@@ -61,7 +65,8 @@ export default function GeneralTab() {
 				username: profile?.username ?? values.userName ?? userInfo.username,
 				user_name: profile?.user_name ?? values.userName ?? userInfo.user_name,
 				contact: profile?.contact ?? values.phone,
-				country: profile?.country ?? values.city,
+				country: profile?.country ?? values.country,
+				city: profile?.city ?? values.city,
 				about: profile?.about ?? values.about,
 			} as UserInfo);
 			toast.success(t("sys.account.messages.updateSuccess"));
@@ -108,6 +113,18 @@ export default function GeneralTab() {
 										render={({ field }) => (
 											<FormItem>
 												<FormLabel>{t("sys.account.general.fields.phone")}</FormLabel>
+												<FormControl>
+													<Input {...field} />
+												</FormControl>
+											</FormItem>
+										)}
+									/>
+									<FormField
+										control={form.control}
+										name="country"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel>{t("sys.account.general.fields.country")}</FormLabel>
 												<FormControl>
 													<Input {...field} />
 												</FormControl>

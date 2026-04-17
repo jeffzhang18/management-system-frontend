@@ -171,6 +171,7 @@
 				"fullName": "Full Name",
 				"role": "Role",
 				"country": "Country",
+				"city": "City",
 				"language": "Language",
 				"contact": "Contact",
 				"email": "Email"
@@ -240,6 +241,7 @@
 					"username": "Username",
 					"email": "Email",
 					"phone": "Phone",
+					"country": "Country",
 					"address": "Address",
 					"city": "City",
 					"code": "Code",

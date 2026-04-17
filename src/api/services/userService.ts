@@ -17,6 +17,7 @@ export interface UpdateUserProfileReq {
 	avatar?: string;
 	language?: string;
 	country?: string;
+	city?: string;
 	contact?: string;
 	about?: string;
 }

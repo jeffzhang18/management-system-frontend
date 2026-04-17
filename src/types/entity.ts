@@ -20,6 +20,7 @@ export interface UserInfo {
 	roles?: Role[];
 	language?: string | null;
 	country?: string | null;
+	city?: string | null;
 	contact?: string | null;
 	about?: string | null;
 	status?: BasicStatus;
