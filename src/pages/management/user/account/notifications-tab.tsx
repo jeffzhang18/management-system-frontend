@@ -56,7 +56,7 @@ export default function NotificationsTab() {
 					</div>
 				</div>
 			</CardContent>
-			<CardFooter className="flex w-full justify-end">
+			<CardFooter className="mt-6 flex w-full justify-center pt-0">
 				<Button onClick={handleClick}>{t("sys.account.actions.saveChanges")}</Button>
 			</CardFooter>
 		</Card>

@@ -14,6 +14,7 @@ export interface UpdateUserProfileReq {
 	name?: string;
 	userName?: string;
 	gender?: number;
+	isPublic?: boolean;
 	avatar?: string;
 	language?: string;
 	country?: string;

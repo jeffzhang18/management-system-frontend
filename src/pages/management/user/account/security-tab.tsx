@@ -82,7 +82,7 @@ export default function SecurityTab() {
 							)}
 						/>
 
-						<div className="flex w-full justify-end">
+						<div className="flex w-full justify-center pt-2">
 							<Button type="submit">{t("sys.account.actions.saveChanges")}</Button>
 						</div>
 					</form>

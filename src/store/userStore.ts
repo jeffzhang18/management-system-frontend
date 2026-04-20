@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Role, UserInfo, UserToken } from "#/entity";
 import { StorageEnum } from "#/enum";
-import userService, { type SignInReq } from "@/api/services/userService";
+import userService, { type SignInReq, type SignInRes, type SignUpReq } from "@/api/services/userService";
 import { removeItem } from "@/utils/storage";
 
 type UserStore = {
@@ -60,6 +60,22 @@ const normalizeUserInfo = (user: RawUserInfo): Partial<UserInfo> => {
 	};
 };
 
+const persistAuthPayload = (
+	res: SignInRes,
+	setUserToken: (token: UserToken) => void,
+	setUserInfo: (userInfo: UserInfo) => void,
+) => {
+	const { user, accessToken, refreshToken } = res;
+	const normalizedUser = normalizeUserInfo(user as RawUserInfo);
+
+	setUserToken({ accessToken, refreshToken });
+	setUserInfo(normalizedUser as UserInfo);
+
+	if (normalizedUser.user_id) {
+		localStorage.setItem(StorageEnum.UserId, normalizedUser.user_id);
+	}
+};
+
 const useUserStore = create<UserStore>()(
 	persist(
 		(set) => ({
@@ -105,13 +121,7 @@ export const useSignIn = () => {
 	const signIn = async (data: SignInReq) => {
 		try {
 			const res = await signInMutation.mutateAsync(data);
-			const { user, accessToken, refreshToken } = res;
-			const normalizedUser = normalizeUserInfo(user as RawUserInfo);
-			setUserToken({ accessToken, refreshToken });
-			setUserInfo(normalizedUser as UserInfo);
-			if (normalizedUser.user_id) {
-				localStorage.setItem(StorageEnum.UserId, normalizedUser.user_id);
-			}
+			persistAuthPayload(res, setUserToken, setUserInfo);
 		} catch (err) {
 			toast.error(err.message, {
 				position: "top-center",
@@ -121,6 +131,29 @@ export const useSignIn = () => {
 	};
 
 	return signIn;
+};
+
+export const useSignUp = () => {
+	const { setUserToken, setUserInfo } = useUserActions();
+
+	const signUpMutation = useMutation({
+		mutationFn: userService.signup,
+	});
+
+	const signUp = async (data: SignUpReq) => {
+		try {
+			const res = await signUpMutation.mutateAsync(data);
+			persistAuthPayload(res, setUserToken, setUserInfo);
+			return res;
+		} catch (err) {
+			toast.error(err.message, {
+				position: "top-center",
+			});
+			throw err;
+		}
+	};
+
+	return signUp;
 };
 
 export default useUserStore;

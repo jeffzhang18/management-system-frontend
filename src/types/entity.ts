@@ -10,6 +10,7 @@ export interface UserInfo {
 	id: string;
 	name?: string;
 	gender?: number | null;
+	isPublic?: boolean;
 	user_id?: string;
 	user_name?: string;
 	email: string;

@@ -1,8 +1,7 @@
-import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import type { SignUpReq } from "@/api/services/userService";
-import userService from "@/api/services/userService";
+import { useSignUp } from "@/store/userStore";
 import { Button } from "@/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/ui/form";
 import { Input } from "@/ui/input";
@@ -12,10 +11,7 @@ import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider
 function RegisterForm() {
 	const { t } = useTranslation();
 	const { loginState, backToLogin } = useLoginStateContext();
-
-	const signUpMutation = useMutation({
-		mutationFn: userService.signup,
-	});
+	const signUp = useSignUp();
 
 	const form = useForm({
 		defaultValues: {
@@ -34,7 +30,7 @@ function RegisterForm() {
 			password: values.password,
 		};
 
-		await signUpMutation.mutateAsync(signUpReq);
+		await signUp(signUpReq);
 		backToLogin();
 	};
 

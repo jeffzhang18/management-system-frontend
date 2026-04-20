@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -26,7 +27,7 @@ export default function GeneralTab() {
 	const { t } = useTranslation();
 	const userInfo = useUserInfo();
 	const { setUserInfo } = useUserActions();
-	const { avatar, username } = userInfo;
+	const { avatar, username, isPublic } = userInfo;
 
 	const form = useForm<FieldType>({
 		defaultValues: {
@@ -47,6 +48,18 @@ export default function GeneralTab() {
 			about: userInfo.about || "",
 		});
 	}, [form, userInfo.about, userInfo.city, userInfo.contact, userInfo.country, userInfo.user_name, userInfo.username]);
+
+	const publicProfileMutation = useMutation({
+		mutationFn: (checked: boolean) => userService.updateProfile({ isPublic: checked }),
+		onSuccess: (profile, checked) => {
+			setUserInfo({
+				...userInfo,
+				...profile,
+				isPublic: profile?.isPublic ?? checked,
+			} as UserInfo);
+			toast.success(t("sys.account.messages.updateSuccess"));
+		},
+	});
 
 	const handleSubmit = async (values: FieldType) => {
 		try {
@@ -73,6 +86,10 @@ export default function GeneralTab() {
 		} catch {}
 	};
 
+	const handlePublicProfileChange = (checked: boolean) => {
+		publicProfileMutation.mutate(checked);
+	};
+
 	return (
 		<div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
 			<div className="col-span-1">
@@ -81,7 +98,11 @@ export default function GeneralTab() {
 
 					<div className="flex items-center py-6 gap-2 w-40">
 						<Text variant="body1">{t("sys.account.general.publicProfile")}</Text>
-						<Switch />
+						<Switch
+							checked={Boolean(isPublic)}
+							disabled={publicProfileMutation.isPending}
+							onCheckedChange={handlePublicProfileChange}
+						/>
 					</div>
 
 					<Button variant="destructive" className="w-40">
@@ -158,7 +179,7 @@ export default function GeneralTab() {
 										)}
 									/>
 								</div>
-								<CardFooter className="flex justify-end px-0">
+								<CardFooter className="mt-6 flex justify-center px-0 pb-0">
 									<Button type="submit">{t("sys.account.actions.saveChanges")}</Button>
 								</CardFooter>
 							</form>
