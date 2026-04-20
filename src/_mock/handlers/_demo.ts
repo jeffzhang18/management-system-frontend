@@ -1,9 +1,17 @@
+import { HttpResponse, http } from "msw";
 import { DemoApi } from "@/api/services/demoService";
 import { ResultStatus } from "@/types/enum";
-import { http, HttpResponse } from "msw";
 
-const mockTokenExpired = http.post(`/api${DemoApi.TOKEN_EXPIRED}`, () => {
+const revokeAccessToken = http.post(`/api${DemoApi.REVOKE_ACCESS_TOKEN}`, () => {
 	return new HttpResponse(null, { status: ResultStatus.TIMEOUT });
 });
 
-export { mockTokenExpired };
+const revokeRefreshToken = http.post(`/api${DemoApi.REVOKE_REFRESH_TOKEN}`, () => {
+	return HttpResponse.json({
+		status: ResultStatus.SUCCESS,
+		data: null,
+		message: "Refresh token revoked",
+	});
+});
+
+export { revokeAccessToken, revokeRefreshToken };

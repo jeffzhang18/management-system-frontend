@@ -1,11 +1,23 @@
 import apiClient from "../apiClient";
 
 export enum DemoApi {
-	TOKEN_EXPIRED = "/user/tokenExpired",
+	REVOKE_ACCESS_TOKEN = "/auth/revoke-access-token",
+	REVOKE_REFRESH_TOKEN = "/auth/revoke-refresh-token",
 }
 
-const mockTokenExpired = () => apiClient.post({ url: DemoApi.TOKEN_EXPIRED });
+type RevokeRefreshTokenPayload = {
+	refreshToken: string;
+};
+
+const revokeAccessToken = () => apiClient.post({ url: DemoApi.REVOKE_ACCESS_TOKEN });
+
+const revokeRefreshToken = (data: RevokeRefreshTokenPayload) =>
+	apiClient.post({
+		url: DemoApi.REVOKE_REFRESH_TOKEN,
+		data,
+	});
 
 export default {
-	mockTokenExpired,
+	revokeAccessToken,
+	revokeRefreshToken,
 };
