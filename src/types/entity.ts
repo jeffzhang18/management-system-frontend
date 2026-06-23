@@ -41,9 +41,6 @@ export interface Permission_Old {
 	icon?: string;
 	component?: string;
 	hide?: boolean;
-	hideTab?: boolean;
-	frameSrc?: URL;
-	newFeature?: boolean;
 	children?: Permission_Old[];
 }
 
