@@ -42,7 +42,7 @@
 - Integrates shadcn/ui, providing a rich set of UI components and design patterns.
 - Written in TypeScript, offering type safety and an improved development experience.
 - Responsive design, adapting to various screen sizes and devices.
-- Flexible routing configuration, supporting nested routes.
+- Flexible Routing configuration, supporting nested routes.
 - Integrated access control based on user roles.
 - Supports internationalization for easy language switching.
 - Includes common admin features like user management, role management, and permission management.
