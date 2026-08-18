@@ -1,12 +1,10 @@
 import {
 	Button,
-	ColorPicker,
 	DatePicker,
 	Flex,
 	Form,
 	Input,
 	Modal,
-	message,
 	Radio,
 	Segmented,
 	Select,
@@ -14,21 +12,29 @@ import {
 	Typography,
 	Upload,
 } from "antd";
-import type { Color } from "antd/es/color-picker";
 import type { Dayjs } from "dayjs";
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { Icon } from "@/components/icon";
 import { themeVars } from "@/theme/theme.css";
 import { Markdown } from "./markdown";
-import { getRecordThemeLabel, type RecordThemeOption, type WorkRecord } from "./types";
+import { getRecordThemeLabel, type RecordThemeOption } from "./types";
 
 interface RecordFormValues {
 	title: string;
 	description?: string;
-	theme: string;
+	theme?: string;
 	time?: [Dayjs, Dayjs];
+}
+
+export interface CreateRecordFormPayload {
+	date: string;
+	title: string;
+	theme?: string;
+	description?: string;
+	startTime?: string;
+	endTime?: string;
 }
 
 interface Props {
@@ -36,9 +42,7 @@ interface Props {
 	date: Dayjs;
 	themes: RecordThemeOption[];
 	onCancel: () => void;
-	onCreate: (value: Omit<WorkRecord, "id" | "createdAt">) => void;
-	onAddTheme: (theme: RecordThemeOption) => void;
-	onDeleteTheme: (value: string) => void;
+	onCreate: (value: CreateRecordFormPayload) => Promise<void> | void;
 	onImport: (file: File) => Promise<boolean>;
 }
 
@@ -48,40 +52,28 @@ export function RecordFormModal({
 	themes,
 	onCancel,
 	onCreate,
-	onAddTheme,
-	onDeleteTheme,
 	onImport,
 }: Props) {
 	const { t } = useTranslation();
 	const [form] = Form.useForm<RecordFormValues>();
 	const [creationMode, setCreationMode] = useState<"quick" | "detail">("quick");
 	const [contentMode, setContentMode] = useState<"edit" | "preview">("edit");
-	const [addingTheme, setAddingTheme] = useState(false);
-	const [themeName, setThemeName] = useState("");
-	const [themeColor, setThemeColor] = useState("#1677ff");
+	const hasThemeOptions = themes.length > 0;
 	const description = Form.useWatch("description", form) ?? "";
+
+	useEffect(() => {
+		if (!open) return;
+		const current = form.getFieldValue("theme");
+		if (!current && themes.length > 0) {
+			form.setFieldValue("theme", themes[0].value);
+		}
+	}, [form, open, themes]);
 
 	const close = () => {
 		form.resetFields();
 		setCreationMode("quick");
 		setContentMode("edit");
-		setAddingTheme(false);
 		onCancel();
-	};
-
-	const addTheme = () => {
-		const label = themeName.trim();
-		if (!label) return message.warning(t("sys.record.form.themeNameRequired"));
-		const theme = { value: `custom_${Date.now().toString(36)}`, label, color: themeColor, custom: true };
-		onAddTheme(theme);
-		form.setFieldValue("theme", theme.value);
-		setThemeName("");
-		setAddingTheme(false);
-	};
-	const deleteTheme = (value: string) => {
-		if (form.getFieldValue("theme") === value) form.setFieldValue("theme", "other");
-		onDeleteTheme(value);
-		message.success(t("sys.record.form.themeDeleted"));
 	};
 
 	return (
@@ -107,20 +99,24 @@ export function RecordFormModal({
 			<Form
 				form={form}
 				layout="vertical"
-				initialValues={{ theme: "development" }}
+				initialValues={{ theme: themes[0]?.value }}
 				preserve
-				onFinish={(values) => {
-					onCreate({
-						date: date.format("YYYY-MM-DD"),
-						title: values.title.trim(),
-						description: creationMode === "detail" ? values.description?.trim() || undefined : undefined,
-						theme: values.theme,
-						startTime: creationMode === "detail" ? values.time?.[0].format("HH:mm") : undefined,
-						endTime: creationMode === "detail" ? values.time?.[1].format("HH:mm") : undefined,
-					});
-					form.resetFields();
-					setCreationMode("quick");
-					setContentMode("edit");
+				onFinish={async (values) => {
+					try {
+						await onCreate({
+							date: date.format("YYYY-MM-DD"),
+							title: values.title.trim(),
+							description: creationMode === "detail" ? values.description?.trim() || undefined : undefined,
+							theme: values.theme,
+							startTime: creationMode === "detail" ? values.time?.[0].format("HH:mm") : undefined,
+							endTime: creationMode === "detail" ? values.time?.[1].format("HH:mm") : undefined,
+						});
+						form.resetFields();
+						setCreationMode("quick");
+						setContentMode("edit");
+					} catch {
+						// handled by caller
+					}
 				}}
 			>
 				<Form.Item
@@ -130,7 +126,7 @@ export function RecordFormModal({
 				>
 					<Input autoFocus maxLength={80} showCount placeholder={t("sys.record.form.recordTitlePlaceholder")} />
 				</Form.Item>
-				{creationMode === "quick" && (
+				{creationMode === "quick" && hasThemeOptions && (
 					<Form.Item name="theme" label={t("sys.record.form.theme")}>
 						<Select
 							options={themes.map((theme) => ({
@@ -148,59 +144,25 @@ export function RecordFormModal({
 
 				{creationMode === "detail" && (
 					<>
-						<Form.Item
-							label={
-								<Flex align="center" gap={8}>
-									<span>{t("sys.record.form.theme")}</span>
-									<Button
-										type="link"
-										size="small"
-										icon={<Icon icon="solar:add-circle-linear" size={16} />}
-										onClick={() => setAddingTheme((value) => !value)}
-									>
-										{t("sys.record.form.newTheme")}
-									</Button>
-								</Flex>
-							}
-						>
-							<Form.Item name="theme" noStyle>
-								<ThemeGroup>
-									{themes.map((theme) => (
-										<ThemeChoice key={theme.value} style={{ "--record-theme-color": theme.color } as CSSProperties}>
-											<Radio.Button value={theme.value} className={theme.custom ? "has-delete" : undefined}>
-												<ThemeDot $color={theme.color} />
-												{getRecordThemeLabel(theme, t)}
-											</Radio.Button>
-											{theme.custom && (
-												<DeleteTheme
-													type="text"
-													size="small"
-													icon={<Icon icon="solar:close-circle-bold" size={15} />}
-													onClick={(event) => {
-														event.preventDefault();
-														event.stopPropagation();
-														deleteTheme(theme.value);
-													}}
-													aria-label={t("sys.record.form.deleteTheme", { name: theme.label })}
-												/>
-											)}
-										</ThemeChoice>
-									))}
-								</ThemeGroup>
+						{hasThemeOptions && (
+							<Form.Item label={t("sys.record.form.theme")}>
+								<Form.Item name="theme" noStyle>
+									<ThemeGroup>
+										{themes.map((theme) => (
+											<ThemeChoice
+												key={theme.value}
+												style={{ "--record-theme-color": theme.color } as CSSProperties}
+											>
+												<Radio.Button value={theme.value}>
+													<ThemeDot $color={theme.color} />
+													{getRecordThemeLabel(theme, t)}
+												</Radio.Button>
+											</ThemeChoice>
+										))}
+									</ThemeGroup>
+								</Form.Item>
 							</Form.Item>
-							{addingTheme && (
-								<Flex gap={8} align="center" style={{ marginTop: 12 }}>
-									<Input
-										value={themeName}
-										onChange={(event) => setThemeName(event.target.value)}
-										placeholder={t("sys.record.form.themeNamePlaceholder")}
-										maxLength={20}
-									/>
-									<ColorPicker value={themeColor} onChange={(color: Color) => setThemeColor(color.toHexString())} />
-									<Button onClick={addTheme}>{t("sys.record.form.add")}</Button>
-								</Flex>
-							)}
-						</Form.Item>
+						)}
 						<Form.Item name="time" label={t("sys.record.form.time")}>
 							<DatePicker.RangePicker picker="time" format="HH:mm" minuteStep={5} style={{ width: "100%" }} />
 						</Form.Item>
@@ -263,9 +225,6 @@ const ThemeGroup = styled(
 	Radio.Group,
 )`display: flex; flex-wrap: wrap; gap: 12px; .ant-radio-button-wrapper { display: inline-flex; align-items: center; gap: 7px; height: 36px; margin: 0 !important; color: var(--record-theme-color); border: 1px solid color-mix(in srgb, var(--record-theme-color) 42%, white); border-inline-start-width: 1px !important; border-radius: 8px !important; background: color-mix(in srgb, var(--record-theme-color) 12%, white); transition: color 160ms ease, border-color 160ms ease, background 160ms ease; } .ant-radio-button-wrapper.has-delete { padding-right: 34px; } .ant-radio-button-wrapper:hover, .ant-radio-button-wrapper-checked { color: white !important; border-color: var(--record-theme-color) !important; background: var(--record-theme-color) !important; box-shadow: none !important; } .ant-radio-button-wrapper::before { display: none !important; }`;
 const ThemeChoice = styled.span`position: relative; display: inline-flex; margin: 0 4px 6px 0; &:hover > .ant-btn { color: white; }`;
-const DeleteTheme = styled(
-	Button,
-)`&& { position: absolute; top: 2px; right: 2px; z-index: 1; width: 30px; height: 32px; padding: 0; color: var(--record-theme-color); background: transparent; } &&:hover { color: white !important; background: rgb(255 255 255 / 16%) !important; }`;
 const ThemeDot = styled.span<{
 	$color: string;
 }>`width: 9px; height: 9px; flex: none; border-radius: 50%; background: ${({ $color }) => $color};`;

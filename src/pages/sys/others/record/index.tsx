@@ -1,78 +1,209 @@
 import { Button, Calendar, Card, Flex, message, Space, Tooltip, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import styled from "styled-components";
+import type { CreateWorkRecordReq } from "@/api/services/workRecordService";
+import workRecordService from "@/api/services/workRecordService";
 import { Icon } from "@/components/icon";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { themeVars } from "@/theme/theme.css";
+import {
+	type CalendarCellRecord,
+	mapCalendarSummaryItem,
+	mapWorkRecordDetail,
+	mergeThemesFromRecords,
+	parseImportRecordsPayload,
+} from "./api-adapter";
 import { ExportModal } from "./export-modal";
-import { type ExportFormat, exportRecords } from "./export-records";
-import { RecordFormModal } from "./record-form-modal";
+import { type ExportFormat } from "./export-records";
+import { type CreateRecordFormPayload, RecordFormModal } from "./record-form-modal";
 import { RecordList } from "./record-list";
-import { importRecords, loadRecords, loadThemes, newRecord, saveCustomThemes, saveRecords } from "./storage";
 import { compareWorkRecords, getRecordTheme, type RecordThemeOption, type WorkRecord } from "./types";
 
 const dateKey = (date: Dayjs) => date.format("YYYY-MM-DD");
+
+const triggerDownload = (blob: Blob, fileName: string) => {
+	const url = URL.createObjectURL(blob);
+	const anchor = document.createElement("a");
+	anchor.href = url;
+	anchor.download = fileName;
+	document.body.appendChild(anchor);
+	anchor.click();
+	document.body.removeChild(anchor);
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 export default function RecordPage() {
 	const { t, i18n } = useTranslation();
 	const navigate = useNavigate();
 	const isMobile = useMediaQuery({ maxWidth: 767 });
-	const [records, setRecords] = useState<WorkRecord[]>(loadRecords);
-	const [themes, setThemes] = useState<RecordThemeOption[]>(loadThemes);
 	const [selectedDate, setSelectedDate] = useState(dayjs());
+	const [calendarRecords, setCalendarRecords] = useState<CalendarCellRecord[]>([]);
+	const [dayRecords, setDayRecords] = useState<WorkRecord[]>([]);
+	const [themes, setThemes] = useState<RecordThemeOption[]>([]);
+	const [calendarLoading, setCalendarLoading] = useState(false);
+	const [dayLoading, setDayLoading] = useState(false);
+	const [exportCount, setExportCount] = useState(0);
+
 	const [createOpen, setCreateOpen] = useState(false);
 	const [exportOpen, setExportOpen] = useState(false);
 	const [exportRange, setExportRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf("month"), dayjs()]);
 	const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
 
-	const recordsByDate = useMemo(() => {
-		const result = new Map<string, WorkRecord[]>();
-		for (const record of records) result.set(record.date, [...(result.get(record.date) ?? []), record]);
-		for (const items of result.values()) items.sort(compareWorkRecords);
+	const selectedDateKey = dateKey(selectedDate);
+	const monthStart = selectedDate.startOf("month").format("YYYY-MM-DD");
+	const monthEnd = selectedDate.endOf("month").format("YYYY-MM-DD");
+
+	const summaryByDate = useMemo(() => {
+		const result = new Map<string, CalendarCellRecord[]>();
+		for (const record of calendarRecords) {
+			result.set(record.date, [...(result.get(record.date) ?? []), record]);
+		}
 		return result;
-	}, [records]);
-	const dayRecords = recordsByDate.get(dateKey(selectedDate)) ?? [];
-	const filteredRecords = records.filter(
-		(record) =>
-			!dayjs(record.date).isBefore(exportRange[0], "day") && !dayjs(record.date).isAfter(exportRange[1], "day"),
-	);
-	const updateRecords = (next: WorkRecord[]) => {
-		setRecords(next);
-		saveRecords(next);
-	};
-	const addTheme = (theme: RecordThemeOption) => {
-		const next = [...themes, theme];
-		setThemes(next);
-		saveCustomThemes(next);
-	};
-	const deleteTheme = (value: string) => {
-		const nextThemes = themes.filter((theme) => theme.value !== value);
-		setThemes(nextThemes);
-		saveCustomThemes(nextThemes);
-		updateRecords(records.map((record) => (record.theme === value ? { ...record, theme: "other" } : record)));
-	};
+	}, [calendarRecords]);
+
+	const loadCalendarSummary = useCallback(async (startDate: string, endDate: string) => {
+		setCalendarLoading(true);
+		try {
+			const records = await workRecordService.getCalendarSummary({ startDate, endDate });
+			setCalendarRecords(records.map(mapCalendarSummaryItem));
+		} finally {
+			setCalendarLoading(false);
+		}
+	}, []);
+
+	const loadDayRecords = useCallback(async (date: string) => {
+		setDayLoading(true);
+		try {
+			const records = await workRecordService.getRecordsByDate(date);
+			const normalized = records.map(mapWorkRecordDetail).sort(compareWorkRecords);
+			setDayRecords(normalized);
+			setThemes((previous) => mergeThemesFromRecords(normalized, previous));
+		} finally {
+			setDayLoading(false);
+		}
+	}, []);
+
+	const loadExportCount = useCallback(async (range: [Dayjs, Dayjs]) => {
+		const startDate = range[0].format("YYYY-MM-DD");
+		const endDate = range[1].format("YYYY-MM-DD");
+		try {
+			const records = await workRecordService.getCalendarSummary({ startDate, endDate });
+			setExportCount(records.length);
+		} catch {
+			setExportCount(0);
+		}
+	}, []);
+
+	useEffect(() => {
+		void loadCalendarSummary(monthStart, monthEnd);
+	}, [loadCalendarSummary, monthEnd, monthStart]);
+
+	useEffect(() => {
+		void loadDayRecords(selectedDateKey);
+	}, [loadDayRecords, selectedDateKey]);
+
+	useEffect(() => {
+		void loadExportCount(exportRange);
+	}, [exportRange, loadExportCount]);
+
+	const reloadData = useCallback(async () => {
+		await Promise.all([
+			loadDayRecords(selectedDateKey),
+			loadCalendarSummary(monthStart, monthEnd),
+			loadExportCount(exportRange),
+		]);
+	}, [exportRange, loadCalendarSummary, loadDayRecords, loadExportCount, monthEnd, monthStart, selectedDateKey]);
 
 	const selectDate = (date: Dayjs, source: string) => {
 		setSelectedDate(date);
 		if (isMobile && source === "date") navigate(`/record/day/${dateKey(date)}`);
 	};
 
+	const handleCreate = async (value: CreateRecordFormPayload) => {
+		const payload: CreateWorkRecordReq = {
+			recordDate: value.date,
+			title: value.title,
+			contentMd: value.description,
+			startTime: value.startTime,
+			endTime: value.endTime,
+		};
+
+		if (value.theme && /^\d+$/.test(value.theme)) {
+			payload.themeId = Number(value.theme);
+		}
+
+		await workRecordService.createRecord(payload);
+		setCreateOpen(false);
+		message.success(t("sys.record.recordSaved"));
+		await reloadData();
+	};
+
+	const handleDelete = async (id: string) => {
+		try {
+			await workRecordService.deleteRecord(id);
+			message.success(t("sys.record.recordDeleted"));
+			await reloadData();
+		} catch {
+			// handled by interceptor
+		}
+	};
+
 	const handleImport = async (file: File) => {
 		try {
-			const imported = importRecords(JSON.parse(await file.text()));
-			if (!imported.length) throw new Error("empty");
-			const ids = new Set(records.map(({ id }) => id));
-			const fresh = imported.filter(({ id }) => !ids.has(id));
-			updateRecords([...records, ...fresh]);
-			message.success(t("sys.record.importSuccess", { count: fresh.length }));
+			const raw = JSON.parse(await file.text()) as unknown;
+			const records = parseImportRecordsPayload(raw, themes);
+			if (!records.length) throw new Error("empty");
+
+			const result = await workRecordService.importRecords({ records });
+			message.success(t("sys.record.importSuccess", { count: result.succeeded }));
+			await reloadData();
 		} catch {
 			message.error(t("sys.record.importFailed"));
 		}
+
 		return false;
+	};
+
+	const handleExport = async () => {
+		if (!exportCount) {
+			message.warning(t("sys.record.export.emptyRange"));
+			return;
+		}
+
+		const startDate = exportRange[0].format("YYYY-MM-DD");
+		const endDate = exportRange[1].format("YYYY-MM-DD");
+
+		try {
+			const result = await workRecordService.exportRecords({
+				startDate,
+				endDate,
+				format: exportFormat,
+			});
+
+			if (exportFormat === "pdf") {
+				const url = URL.createObjectURL(result.blob);
+				const popup = window.open(url, "_blank", "noopener,noreferrer");
+				if (!popup) {
+					URL.revokeObjectURL(url);
+					message.error(t("sys.record.export.popupBlocked"));
+					return;
+				}
+				setTimeout(() => URL.revokeObjectURL(url), 30_000);
+				message.success(t("sys.record.export.pdfOpened"));
+			} else {
+				triggerDownload(result.blob, result.fileName);
+				message.success(t("sys.record.export.exported", { count: exportCount }));
+			}
+
+			setExportOpen(false);
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : t("sys.api.errorMessage");
+			message.error(errorMessage);
+		}
 	};
 
 	return (
@@ -92,7 +223,7 @@ export default function RecordPage() {
 			</Flex>
 
 			<Workspace>
-				<CalendarCard styles={{ body: { padding: isMobile ? 8 : 16 } }}>
+				<CalendarCard styles={{ body: { padding: isMobile ? 8 : 16 } }} loading={calendarLoading}>
 					<Calendar
 						value={selectedDate}
 						onSelect={(date, info) => selectDate(date, info.source)}
@@ -166,7 +297,25 @@ export default function RecordPage() {
 						)}
 						fullCellRender={(date, info) => {
 							if (info.type !== "date") return info.originNode;
-							const items = recordsByDate.get(dateKey(date)) ?? [];
+
+							const key = dateKey(date);
+							const summaryItems = summaryByDate.get(key) ?? [];
+							const items =
+								key === selectedDateKey
+									? dayRecords.map((record) => ({
+										id: record.id,
+										color: record.themeColor ?? getRecordTheme(record.theme, themes).color,
+										title: record.title,
+									}))
+									: summaryItems;
+
+							const tooltip = items.some((item) => "title" in item && item.title)
+								? items
+										.filter((item): item is { id: string; color: string; title: string } => "title" in item && !!item.title)
+										.map((item) => item.title)
+										.join("\n")
+								: t("sys.record.dayRecordCount", { count: items.length });
+
 							return (
 								<DateCell
 									$selected={date.isSame(selectedDate, "day")}
@@ -184,19 +333,12 @@ export default function RecordPage() {
 												setSelectedDate(date);
 												setCreateOpen(true);
 											}}
-											aria-label={t("sys.record.addOnDate", { date: dateKey(date) })}
+											aria-label={t("sys.record.addOnDate", { date: key })}
 										/>
 									)}
-									<CellRecords
-										aria-label={t("sys.record.viewDate", { date: dateKey(date) })}
-										title={items.map((record) => record.title).join("\n")}
-									>
+									<CellRecords aria-label={t("sys.record.viewDate", { date: key })} title={tooltip}>
 										{items.slice(0, 4).map((record) => (
-											<i
-												key={record.id}
-												aria-hidden="true"
-												style={{ background: getRecordTheme(record.theme, themes).color }}
-											/>
+											<i key={record.id} aria-hidden="true" style={{ background: record.color }} />
 										))}
 										{items.length > 4 && <span aria-hidden="true">…</span>}
 									</CellRecords>
@@ -208,6 +350,7 @@ export default function RecordPage() {
 
 				{!isMobile && (
 					<Card
+						loading={dayLoading}
 						title={
 							<DayCardTitle>
 								<span>
@@ -235,8 +378,7 @@ export default function RecordPage() {
 							themes={themes}
 							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar" } })}
 							onDelete={(id) => {
-								updateRecords(records.filter((record) => record.id !== id));
-								message.success(t("sys.record.recordDeleted"));
+								void handleDelete(id);
 							}}
 						/>
 					</Card>
@@ -248,35 +390,20 @@ export default function RecordPage() {
 				date={selectedDate}
 				themes={themes}
 				onCancel={() => setCreateOpen(false)}
-				onAddTheme={addTheme}
-				onDeleteTheme={deleteTheme}
 				onImport={handleImport}
-				onCreate={(value) => {
-					updateRecords([...records, newRecord(value)]);
-					setCreateOpen(false);
-					message.success(t("sys.record.recordSaved"));
-				}}
+				onCreate={handleCreate}
 			/>
 
 			<ExportModal
 				open={exportOpen}
 				range={exportRange}
 				format={exportFormat}
-				count={filteredRecords.length}
+				count={exportCount}
 				onRangeChange={setExportRange}
 				onFormatChange={setExportFormat}
 				onCancel={() => setExportOpen(false)}
 				onExport={() => {
-					if (!filteredRecords.length) return message.warning(t("sys.record.export.emptyRange"));
-					const range = `${exportRange[0].format("YYYY-MM-DD")}_${exportRange[1].format("YYYY-MM-DD")}`;
-					if (!exportRecords(filteredRecords, themes, range, exportFormat))
-						return message.error(t("sys.record.export.popupBlocked"));
-					setExportOpen(false);
-					message.success(
-						exportFormat === "pdf"
-							? t("sys.record.export.pdfOpened")
-							: t("sys.record.export.exported", { count: filteredRecords.length }),
-					);
+					void handleExport();
 				}}
 			/>
 		</Page>
@@ -304,7 +431,8 @@ const DateCell = styled.div<{ $selected: boolean; $today: boolean; $outside: boo
 	overflow: hidden;
 	border: 1px solid ${({ $selected }) => ($selected ? themeVars.colors.palette.primary.default : "transparent")};
 	border-radius: 12px;
-	background: ${({ $selected }) => ($selected ? `color-mix(in srgb, ${themeVars.colors.palette.primary.default} 16%, transparent)` : "transparent")};
+	background: ${({ $selected }) =>
+		$selected ? `color-mix(in srgb, ${themeVars.colors.palette.primary.default} 16%, transparent)` : "transparent"};
 	opacity: ${({ $outside }) => ($outside ? 0.4 : 1)};
 	transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 	&:hover {
@@ -313,7 +441,8 @@ const DateCell = styled.div<{ $selected: boolean; $today: boolean; $outside: boo
 		box-shadow: 0 4px 14px rgb(0 0 0 / 5%);
 	}
 	&:hover button { opacity: 1; }
-	${({ $today, $selected }) => ($today && !$selected ? `> span:first-child { color: white; background: ${themeVars.colors.palette.primary.default}; }` : "")}
+	${({ $today, $selected }) =>
+		$today && !$selected ? `> span:first-child { color: white; background: ${themeVars.colors.palette.primary.default}; }` : ""}
 	@media (max-width: 767px) { padding: 5px; border-radius: 8px; }
 `;
 const DateNumber = styled.span`

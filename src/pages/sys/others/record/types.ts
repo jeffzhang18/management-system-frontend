@@ -13,6 +13,10 @@ export interface WorkRecord {
 	title: string;
 	description?: string;
 	theme: RecordTheme;
+	themeId?: number;
+	themeName?: string;
+	themeColor?: string;
+	themeKey?: string;
 	startTime?: string;
 	endTime?: string;
 	createdAt: string;

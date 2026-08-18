@@ -1,52 +1,89 @@
 import { Button, Card, Flex, message, Typography } from "antd";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
+import type { CreateWorkRecordReq } from "@/api/services/workRecordService";
+import workRecordService from "@/api/services/workRecordService";
 import { Icon } from "@/components/icon";
-import { RecordFormModal } from "./record-form-modal";
+import { mapWorkRecordDetail, mergeThemesFromRecords, parseImportRecordsPayload } from "./api-adapter";
+import { type CreateRecordFormPayload, RecordFormModal } from "./record-form-modal";
 import { RecordList } from "./record-list";
-import { importRecords, loadRecords, loadThemes, newRecord, saveCustomThemes, saveRecords } from "./storage";
 import { compareWorkRecords, type RecordThemeOption, type WorkRecord } from "./types";
 
 export default function RecordDayPage() {
 	const { t, i18n } = useTranslation();
 	const { date = "" } = useParams();
 	const navigate = useNavigate();
-	const selectedDate = dayjs(date, "YYYY-MM-DD", true).isValid() ? dayjs(date) : dayjs();
-	const [records, setRecords] = useState<WorkRecord[]>(loadRecords);
-	const [themes, setThemes] = useState<RecordThemeOption[]>(loadThemes);
-	const [createOpen, setCreateOpen] = useState(false);
-	const dayRecords = records
-		.filter((record) => record.date === selectedDate.format("YYYY-MM-DD"))
-		.sort(compareWorkRecords);
+	const selectedDate = useMemo(
+		() => (dayjs(date, "YYYY-MM-DD", true).isValid() ? dayjs(date) : dayjs()),
+		[date],
+	);
+	const selectedDateKey = selectedDate.format("YYYY-MM-DD");
 
-	const updateRecords = (next: WorkRecord[]) => {
-		setRecords(next);
-		saveRecords(next);
+	const [records, setRecords] = useState<WorkRecord[]>([]);
+	const [themes, setThemes] = useState<RecordThemeOption[]>([]);
+	const [loading, setLoading] = useState(false);
+	const [createOpen, setCreateOpen] = useState(false);
+
+	const loadDayRecords = useCallback(async () => {
+		setLoading(true);
+		try {
+			const data = await workRecordService.getRecordsByDate(selectedDateKey);
+			const normalized = data.map(mapWorkRecordDetail).sort(compareWorkRecords);
+			setRecords(normalized);
+			setThemes((previous) => mergeThemesFromRecords(normalized, previous));
+		} finally {
+			setLoading(false);
+		}
+	}, [selectedDateKey]);
+
+	useEffect(() => {
+		void loadDayRecords();
+	}, [loadDayRecords]);
+
+	const handleCreate = async (value: CreateRecordFormPayload) => {
+		const payload: CreateWorkRecordReq = {
+			recordDate: value.date,
+			title: value.title,
+			contentMd: value.description,
+			startTime: value.startTime,
+			endTime: value.endTime,
+		};
+
+		if (value.theme && /^\d+$/.test(value.theme)) {
+			payload.themeId = Number(value.theme);
+		}
+
+		await workRecordService.createRecord(payload);
+		setCreateOpen(false);
+		message.success(t("sys.record.recordSaved"));
+		await loadDayRecords();
 	};
-	const addTheme = (theme: RecordThemeOption) => {
-		const next = [...themes, theme];
-		setThemes(next);
-		saveCustomThemes(next);
+
+	const handleDelete = async (id: string) => {
+		try {
+			await workRecordService.deleteRecord(id);
+			message.success(t("sys.record.recordDeleted"));
+			await loadDayRecords();
+		} catch {
+			// handled by interceptor
+		}
 	};
-	const deleteTheme = (value: string) => {
-		const nextThemes = themes.filter((theme) => theme.value !== value);
-		setThemes(nextThemes);
-		saveCustomThemes(nextThemes);
-		updateRecords(records.map((record) => (record.theme === value ? { ...record, theme: "other" } : record)));
-	};
+
 	const handleImport = async (file: File) => {
 		try {
-			const imported = importRecords(JSON.parse(await file.text()));
-			if (!imported.length) throw new Error("empty");
-			const ids = new Set(records.map(({ id }) => id));
-			const fresh = imported.filter(({ id }) => !ids.has(id));
-			updateRecords([...records, ...fresh]);
-			message.success(t("sys.record.importSuccess", { count: fresh.length }));
+			const raw = JSON.parse(await file.text()) as unknown;
+			const recordsToImport = parseImportRecordsPayload(raw, themes);
+			if (!recordsToImport.length) throw new Error("empty");
+
+			const result = await workRecordService.importRecords({ records: recordsToImport });
+			message.success(t("sys.record.importSuccess", { count: result.succeeded }));
+			await loadDayRecords();
 		} catch {
 			message.error(t("sys.record.importFailed"));
 		}
+
 		return false;
 	};
 
@@ -65,9 +102,7 @@ export default function RecordDayPage() {
 							? selectedDate.format("YYYY年 M月D日 · dddd")
 							: selectedDate.format("MMMM D, YYYY · dddd")}
 					</Typography.Title>
-					<Typography.Text type="secondary">
-						{t("sys.record.dayRecordCount", { count: dayRecords.length })}
-					</Typography.Text>
+					<Typography.Text type="secondary">{t("sys.record.dayRecordCount", { count: records.length })}</Typography.Text>
 				</div>
 				<Button
 					type="primary"
@@ -77,14 +112,13 @@ export default function RecordDayPage() {
 					{t("sys.record.new")}
 				</Button>
 			</Flex>
-			<Card>
+			<Card loading={loading}>
 				<RecordList
-					records={dayRecords}
+					records={records}
 					themes={themes}
 					onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "day" } })}
 					onDelete={(id) => {
-						updateRecords(records.filter((record) => record.id !== id));
-						message.success(t("sys.record.recordDeleted"));
+						void handleDelete(id);
 					}}
 				/>
 			</Card>
@@ -93,14 +127,8 @@ export default function RecordDayPage() {
 				date={selectedDate}
 				themes={themes}
 				onCancel={() => setCreateOpen(false)}
-				onAddTheme={addTheme}
-				onDeleteTheme={deleteTheme}
 				onImport={handleImport}
-				onCreate={(value) => {
-					updateRecords([...records, newRecord(value)]);
-					setCreateOpen(false);
-					message.success(t("sys.record.recordSaved"));
-				}}
+				onCreate={handleCreate}
 			/>
 		</div>
 	);
