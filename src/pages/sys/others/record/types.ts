@@ -5,6 +5,8 @@ export interface RecordThemeOption {
 	label: string;
 	color: string;
 	custom?: boolean;
+	themeId?: number;
+	themeKey?: string;
 }
 
 export interface WorkRecord {
@@ -34,8 +36,10 @@ export const DEFAULT_RECORD_THEMES: RecordThemeOption[] = [
 export const getRecordTheme = (value: RecordTheme, themes: RecordThemeOption[] = DEFAULT_RECORD_THEMES) =>
 	themes.find((theme) => theme.value === value) ?? DEFAULT_RECORD_THEMES[DEFAULT_RECORD_THEMES.length - 1];
 
+const isBuiltInThemeValue = (value: string) => DEFAULT_RECORD_THEMES.some((theme) => theme.value === value);
+
 export const getRecordThemeLabel = (theme: RecordThemeOption, translate: (key: string) => string) =>
-	theme.custom ? theme.label : translate(`sys.record.themes.${theme.value}`);
+	isBuiltInThemeValue(theme.value) ? translate(`sys.record.themes.${theme.value}`) : theme.label;
 
 export const compareWorkRecords = (a: WorkRecord, b: WorkRecord) => {
 	if (a.startTime && b.startTime)

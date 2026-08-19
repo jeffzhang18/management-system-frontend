@@ -1,19 +1,21 @@
 import {
 	Button,
+	ColorPicker,
 	DatePicker,
 	Flex,
 	Form,
 	Input,
 	Modal,
+	message,
 	Radio,
 	Segmented,
 	Select,
-	Switch,
 	Typography,
 	Upload,
 } from "antd";
+import type { Color } from "antd/es/color-picker";
 import type { Dayjs } from "dayjs";
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { Icon } from "@/components/icon";
@@ -43,6 +45,7 @@ interface Props {
 	themes: RecordThemeOption[];
 	onCancel: () => void;
 	onCreate: (value: CreateRecordFormPayload) => Promise<void> | void;
+	onAddTheme: (theme: RecordThemeOption) => Promise<RecordThemeOption | void> | RecordThemeOption | void;
 	onImport: (file: File) => Promise<boolean>;
 }
 
@@ -52,14 +55,56 @@ export function RecordFormModal({
 	themes,
 	onCancel,
 	onCreate,
+	onAddTheme,
 	onImport,
 }: Props) {
 	const { t } = useTranslation();
 	const [form] = Form.useForm<RecordFormValues>();
 	const [creationMode, setCreationMode] = useState<"quick" | "detail">("quick");
 	const [contentMode, setContentMode] = useState<"edit" | "preview">("edit");
+	const [detailToggleDrag, setDetailToggleDrag] = useState<number | null>(null);
+	const detailToggleDragStart = useRef({ x: 0, offset: 0 });
+	const detailToggleMoved = useRef(false);
+	const detailTogglePointer = useRef<number | null>(null);
+	const [addingTheme, setAddingTheme] = useState(false);
+	const [themeName, setThemeName] = useState("");
+	const [themeColor, setThemeColor] = useState("#1677ff");
 	const hasThemeOptions = themes.length > 0;
 	const description = Form.useWatch("description", form) ?? "";
+
+	const startDetailToggleDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+		if (event.button !== 0) return;
+		detailTogglePointer.current = event.pointerId;
+		detailToggleDragStart.current = { x: event.clientX, offset: contentMode === "preview" ? 52 : 0 };
+		detailToggleMoved.current = false;
+	};
+
+	const moveDetailToggleDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+		if (detailTogglePointer.current !== event.pointerId) return;
+		const distance = event.clientX - detailToggleDragStart.current.x;
+		if (!detailToggleMoved.current && Math.abs(distance) > 3) {
+			detailToggleMoved.current = true;
+			event.currentTarget.setPointerCapture(event.pointerId);
+		}
+		if (!detailToggleMoved.current) return;
+		setDetailToggleDrag(Math.min(52, Math.max(0, detailToggleDragStart.current.offset + distance)));
+	};
+
+	const endDetailToggleDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+		if (detailTogglePointer.current !== event.pointerId) return;
+		detailTogglePointer.current = null;
+		if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+			event.currentTarget.releasePointerCapture(event.pointerId);
+		}
+		const finalOffset = Math.min(
+			52,
+			Math.max(0, detailToggleDragStart.current.offset + event.clientX - detailToggleDragStart.current.x),
+		);
+		if (detailToggleMoved.current) {
+			setContentMode(finalOffset >= 26 ? "preview" : "edit");
+		}
+		setDetailToggleDrag(null);
+	};
 
 	useEffect(() => {
 		if (!open) return;
@@ -73,11 +118,33 @@ export function RecordFormModal({
 		form.resetFields();
 		setCreationMode("quick");
 		setContentMode("edit");
+		setAddingTheme(false);
 		onCancel();
 	};
 
+	const addTheme = () => {
+		if (addingTheme) return;
+		const label = themeName.trim();
+		if (!label) return message.warning(t("sys.record.form.themeNameRequired"));
+		const theme = {
+			value: `custom_${Date.now().toString(36)}`,
+			label,
+			color: themeColor,
+			custom: true,
+		};
+		Promise.resolve(onAddTheme(theme))
+			.then((createdTheme) => {
+				form.setFieldValue("theme", createdTheme?.value ?? theme.value);
+				setThemeName("");
+				setAddingTheme(false);
+			})
+			.catch(() => {
+				// handled by caller
+			});
+	};
+
 	return (
-		<Modal
+		<RecordModal
 			title={t("sys.record.form.title", { date: date.format("YYYY-MM-DD") })}
 			open={open}
 			onCancel={close}
@@ -97,6 +164,7 @@ export function RecordFormModal({
 				]}
 			/>
 			<Form
+				className="record-form"
 				form={form}
 				layout="vertical"
 				initialValues={{ theme: themes[0]?.value }}
@@ -114,6 +182,7 @@ export function RecordFormModal({
 						form.resetFields();
 						setCreationMode("quick");
 						setContentMode("edit");
+						setAddingTheme(false);
 					} catch {
 						// handled by caller
 					}
@@ -145,7 +214,20 @@ export function RecordFormModal({
 				{creationMode === "detail" && (
 					<>
 						{hasThemeOptions && (
-							<Form.Item label={t("sys.record.form.theme")}>
+							<Form.Item
+								label={
+									<Flex align="center" gap={8}>
+										<span>{t("sys.record.form.theme")}</span>
+										<Button
+											type="link"
+											icon={<Icon icon="solar:add-circle-linear" size={16} />}
+											onClick={() => setAddingTheme((value) => !value)}
+										>
+											{t("sys.record.form.newTheme")}
+										</Button>
+									</Flex>
+								}
+							>
 								<Form.Item name="theme" noStyle>
 									<ThemeGroup>
 										{themes.map((theme) => (
@@ -161,6 +243,18 @@ export function RecordFormModal({
 										))}
 									</ThemeGroup>
 								</Form.Item>
+								{addingTheme && (
+									<Flex gap={8} align="center" style={{ marginTop: 12 }}>
+										<Input
+											value={themeName}
+											onChange={(event) => setThemeName(event.target.value)}
+											placeholder={t("sys.record.form.themeNamePlaceholder")}
+											maxLength={20}
+										/>
+										<ColorPicker value={themeColor} onChange={(color: Color) => setThemeColor(color.toHexString())} />
+										<Button onClick={addTheme}>{t("sys.record.form.add")}</Button>
+									</Flex>
+								)}
 							</Form.Item>
 						)}
 						<Form.Item name="time" label={t("sys.record.form.time")}>
@@ -168,15 +262,50 @@ export function RecordFormModal({
 						</Form.Item>
 						<Form.Item
 							label={
-								<Flex justify="space-between" align="center">
+								<Flex justify="space-between" align="center" style={{ width: "100%" }}>
 									<span>{t("sys.record.form.details")}</span>
-									<Switch
-										size="small"
-										checked={contentMode === "preview"}
-										onChange={(checked) => setContentMode(checked ? "preview" : "edit")}
-										checkedChildren={t("sys.record.form.preview")}
-										unCheckedChildren={t("sys.record.form.edit")}
-									/>
+									<DetailModeToggle
+										role="group"
+										aria-label={t("sys.record.form.details")}
+										onPointerDown={startDetailToggleDrag}
+										onPointerMove={moveDetailToggleDrag}
+										onPointerUp={endDetailToggleDrag}
+										onPointerCancel={endDetailToggleDrag}
+										onClick={(event) => {
+											if (detailToggleMoved.current) {
+												detailToggleMoved.current = false;
+												return;
+											}
+											if (event.detail === 0) return;
+											const bounds = event.currentTarget.getBoundingClientRect();
+											setContentMode(event.clientX - bounds.left >= bounds.width / 2 ? "preview" : "edit");
+										}}
+									>
+										<DetailModeThumb
+											$offset={detailToggleDrag ?? (contentMode === "preview" ? 52 : 0)}
+											$dragging={detailToggleDrag !== null}
+										/>
+										<DetailModeOption
+											type="button"
+											$active={contentMode === "edit"}
+											aria-pressed={contentMode === "edit"}
+											onClick={() => {
+												if (!detailToggleMoved.current) setContentMode("edit");
+											}}
+										>
+											{t("sys.record.form.edit")}
+										</DetailModeOption>
+										<DetailModeOption
+											type="button"
+											$active={contentMode === "preview"}
+											aria-pressed={contentMode === "preview"}
+											onClick={() => {
+												if (!detailToggleMoved.current) setContentMode("preview");
+											}}
+										>
+											{t("sys.record.form.preview")}
+										</DetailModeOption>
+									</DetailModeToggle>
 								</Flex>
 							}
 						>
@@ -214,16 +343,74 @@ export function RecordFormModal({
 					</>
 				)}
 			</Form>
-		</Modal>
+		</RecordModal>
 	);
 }
+
+const RecordModal = styled(Modal)`
+	.record-form .ant-form-item-label > label {
+		width: 100%;
+	}
+`;
+
+const DetailModeToggle = styled.div`
+	position: relative;
+	display: grid;
+	grid-template-columns: repeat(2, 52px);
+	height: 30px;
+	padding: 2px;
+	border: 1px solid #d9d9d9;
+	border-radius: 8px;
+	background: #f5f5f5;
+	touch-action: none;
+	user-select: none;
+`;
+
+const DetailModeThumb = styled.span<{ $offset: number; $dragging: boolean }>`
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 52px;
+	height: 24px;
+	border-radius: 6px;
+	background: ${themeVars.colors.palette.primary.default};
+	box-shadow: 0 1px 3px rgb(0 0 0 / 18%);
+	transform: translateX(${({ $offset }) => `${$offset}px`});
+	transition: ${({ $dragging }) => ($dragging ? "none" : "transform 160ms ease")};
+`;
+
+const DetailModeOption = styled.button<{ $active: boolean }>`
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 52px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 6px;
+	color: ${({ $active }) => ($active ? "#fff" : "#595959")};
+	font: inherit;
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1;
+	background: transparent;
+	cursor: pointer;
+	transition: color 160ms ease;
+
+	&:focus-visible {
+		outline: 2px solid ${themeVars.colors.palette.primary.default};
+		outline-offset: 1px;
+	}
+`;
 
 const CreationSwitch = styled(
 	Segmented,
 )`margin-bottom: 20px; padding: 4px; background: color-mix(in srgb, ${themeVars.colors.palette.primary.default} 10%, transparent); .ant-segmented-thumb, .ant-segmented-item-selected { color: white !important; background: ${themeVars.colors.palette.primary.default} !important; box-shadow: 0 2px 8px color-mix(in srgb, ${themeVars.colors.palette.primary.default} 28%, transparent) !important; } .ant-segmented-item-selected .ant-segmented-item-label { color: white !important; font-weight: 600; }`;
 const ThemeGroup = styled(
 	Radio.Group,
-)`display: flex; flex-wrap: wrap; gap: 12px; .ant-radio-button-wrapper { display: inline-flex; align-items: center; gap: 7px; height: 36px; margin: 0 !important; color: var(--record-theme-color); border: 1px solid color-mix(in srgb, var(--record-theme-color) 42%, white); border-inline-start-width: 1px !important; border-radius: 8px !important; background: color-mix(in srgb, var(--record-theme-color) 12%, white); transition: color 160ms ease, border-color 160ms ease, background 160ms ease; } .ant-radio-button-wrapper.has-delete { padding-right: 34px; } .ant-radio-button-wrapper:hover, .ant-radio-button-wrapper-checked { color: white !important; border-color: var(--record-theme-color) !important; background: var(--record-theme-color) !important; box-shadow: none !important; } .ant-radio-button-wrapper::before { display: none !important; }`;
+)`display: flex; flex-wrap: wrap; gap: 12px; .ant-radio-button-wrapper { display: inline-flex; align-items: center; gap: 7px; height: 36px; margin: 0 !important; color: var(--record-theme-color); border: 1px solid color-mix(in srgb, var(--record-theme-color) 42%, white); border-inline-start-width: 1px !important; border-radius: 8px !important; background: color-mix(in srgb, var(--record-theme-color) 12%, white); transition: color 160ms ease, border-color 160ms ease, background 160ms ease; } .ant-radio-button-wrapper:hover, .ant-radio-button-wrapper-checked { color: white !important; border-color: var(--record-theme-color) !important; background: var(--record-theme-color) !important; box-shadow: none !important; } .ant-radio-button-wrapper::before { display: none !important; }`;
 const ThemeChoice = styled.span`position: relative; display: inline-flex; margin: 0 4px 6px 0; &:hover > .ant-btn { color: white; }`;
 const ThemeDot = styled.span<{
 	$color: string;

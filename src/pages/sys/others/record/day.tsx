@@ -6,7 +6,12 @@ import { useNavigate, useParams } from "react-router";
 import type { CreateWorkRecordReq } from "@/api/services/workRecordService";
 import workRecordService from "@/api/services/workRecordService";
 import { Icon } from "@/components/icon";
-import { mapWorkRecordDetail, mergeThemesFromRecords, parseImportRecordsPayload } from "./api-adapter";
+import {
+	mapThemeListToOptions,
+	mapWorkRecordDetail,
+	parseImportRecordsPayload,
+	resolveThemeIdByThemeValue,
+} from "./api-adapter";
 import { type CreateRecordFormPayload, RecordFormModal } from "./record-form-modal";
 import { RecordList } from "./record-list";
 import { compareWorkRecords, type RecordThemeOption, type WorkRecord } from "./types";
@@ -32,17 +37,27 @@ export default function RecordDayPage() {
 			const data = await workRecordService.getRecordsByDate(selectedDateKey);
 			const normalized = data.map(mapWorkRecordDetail).sort(compareWorkRecords);
 			setRecords(normalized);
-			setThemes((previous) => mergeThemesFromRecords(normalized, previous));
 		} finally {
 			setLoading(false);
 		}
 	}, [selectedDateKey]);
 
+	const loadThemeList = useCallback(async () => {
+		const themeList = await workRecordService.getThemes();
+		setThemes(mapThemeListToOptions(themeList));
+	}, []);
+
 	useEffect(() => {
 		void loadDayRecords();
 	}, [loadDayRecords]);
 
+	useEffect(() => {
+		void loadThemeList();
+	}, [loadThemeList]);
+
 	const handleCreate = async (value: CreateRecordFormPayload) => {
+		const selectedTheme = value.theme;
+		const resolvedThemeId = resolveThemeIdByThemeValue(selectedTheme);
 		const payload: CreateWorkRecordReq = {
 			recordDate: value.date,
 			title: value.title,
@@ -51,14 +66,14 @@ export default function RecordDayPage() {
 			endTime: value.endTime,
 		};
 
-		if (value.theme && /^\d+$/.test(value.theme)) {
-			payload.themeId = Number(value.theme);
-		}
+		if (resolvedThemeId) payload.themeId = resolvedThemeId;
 
 		await workRecordService.createRecord(payload);
+
 		setCreateOpen(false);
 		message.success(t("sys.record.recordSaved"));
 		await loadDayRecords();
+		await loadThemeList();
 	};
 
 	const handleDelete = async (id: string) => {
@@ -71,6 +86,19 @@ export default function RecordDayPage() {
 		}
 	};
 
+	const addTheme = async (theme: RecordThemeOption) => {
+		const created = await workRecordService.createTheme({
+			themeName: theme.label,
+			color: theme.color,
+		});
+		const createdOption = mapThemeListToOptions([created])[0];
+		setThemes((previous) => {
+			const filtered = previous.filter((item) => item.value !== createdOption.value);
+			return [...filtered, createdOption];
+		});
+		return createdOption;
+	};
+
 	const handleImport = async (file: File) => {
 		try {
 			const raw = JSON.parse(await file.text()) as unknown;
@@ -80,6 +108,7 @@ export default function RecordDayPage() {
 			const result = await workRecordService.importRecords({ records: recordsToImport });
 			message.success(t("sys.record.importSuccess", { count: result.succeeded }));
 			await loadDayRecords();
+			await loadThemeList();
 		} catch {
 			message.error(t("sys.record.importFailed"));
 		}
@@ -127,6 +156,7 @@ export default function RecordDayPage() {
 				date={selectedDate}
 				themes={themes}
 				onCancel={() => setCreateOpen(false)}
+				onAddTheme={addTheme}
 				onImport={handleImport}
 				onCreate={handleCreate}
 			/>

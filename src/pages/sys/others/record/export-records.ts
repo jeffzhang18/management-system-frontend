@@ -1,5 +1,11 @@
 import i18n from "@/locales/i18n";
-import { compareWorkRecords, getRecordTheme, type RecordThemeOption, type WorkRecord } from "./types";
+import {
+	compareWorkRecords,
+	getRecordTheme,
+	getRecordThemeLabel,
+	type RecordThemeOption,
+	type WorkRecord,
+} from "./types";
 
 export type ExportFormat = "txt" | "pdf" | "json";
 
@@ -13,19 +19,26 @@ const timeLabel = (record: WorkRecord) =>
 			: i18n.t("sys.record.fromTime", { time: record.startTime })
 		: i18n.t("sys.record.allDay");
 
-const themeLabel = (theme: RecordThemeOption) =>
-	theme.custom ? theme.label : i18n.t(`sys.record.themes.${theme.value}`);
+const themeLabel = (theme: RecordThemeOption) => getRecordThemeLabel(theme, (key) => i18n.t(key));
 
 const download = (filename: string, content: string, type: string) => {
-	const url = URL.createObjectURL(new Blob([content], { type }));
+	const url = URL.createObjectURL(new Blob(["\uFEFF", content], { type }));
 	const link = document.createElement("a");
 	link.href = url;
 	link.download = filename;
+	document.body.appendChild(link);
 	link.click();
-	URL.revokeObjectURL(url);
+	link.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-export function exportRecords(records: WorkRecord[], themes: RecordThemeOption[], range: string, format: ExportFormat) {
+export function exportRecords(
+	records: WorkRecord[],
+	themes: RecordThemeOption[],
+	range: string,
+	format: ExportFormat,
+	pdfWindow?: Window | null,
+) {
 	const items = sorted(records);
 	const exportTitle = i18n.t("sys.record.title");
 	if (format === "json") {
@@ -44,7 +57,7 @@ export function exportRecords(records: WorkRecord[], themes: RecordThemeOption[]
 		return true;
 	}
 
-	const popup = window.open("", "_blank");
+	const popup = pdfWindow ?? window.open("", "_blank");
 	if (!popup) return false;
 	const escapeHtml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 	const content = items

@@ -1,3 +1,4 @@
+import axios from "axios";
 import { GLOBAL_CONFIG } from "@/global-config";
 import userStore from "@/store/userStore";
 import apiClient from "../apiClient";
@@ -8,6 +9,14 @@ export interface WorkRecordThemeDetail {
 	themeName: string;
 	color: string;
 	isSystem: boolean;
+	sortNo?: number;
+}
+
+export interface CreateWorkRecordThemeReq {
+	themeName: string;
+	color: string;
+	themeKey?: string;
+	sortNo?: number;
 }
 
 export interface WorkRecordDetail {
@@ -27,6 +36,12 @@ export interface WorkRecordCalendarSummaryItem {
 	id: number;
 	recordDate: string;
 	color: string;
+}
+
+export interface WorkRecordContributionItem {
+	date: string;
+	records: number;
+	level: 0 | 1 | 2 | 3 | 4;
 }
 
 export interface CreateWorkRecordReq {
@@ -74,18 +89,12 @@ export interface CalendarRangeReq {
 
 enum WorkRecordApi {
 	Calendar = "/work-records/calendar",
+	Contributions = "/work-records/contributions",
 	Records = "/work-records",
+	Themes = "/work-records/themes",
 	Export = "/work-records/export",
 	Import = "/work-records/import",
 }
-
-const joinApiUrl = (path: string) => {
-	const baseUrl = GLOBAL_CONFIG.apiBaseUrl.replace(/\/+$/g, "");
-	const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-	if (/^https?:\/\//i.test(baseUrl)) return `${baseUrl}${normalizedPath}`;
-	if (typeof window !== "undefined") return `${window.location.origin}${baseUrl}${normalizedPath}`;
-	return `${baseUrl}${normalizedPath}`;
-};
 
 const parseFileName = (contentDisposition: string | null, fallback: string) => {
 	if (!contentDisposition) return fallback;
@@ -111,6 +120,16 @@ const getRecordsByDate = (date: string) => {
 	return apiClient.get<WorkRecordDetail[]>({ url: `${WorkRecordApi.Records}?${params.toString()}` });
 };
 
+const getContributions = (year: number) => {
+	const params = new URLSearchParams({ year: String(year) });
+	return apiClient.get<WorkRecordContributionItem[]>({ url: `${WorkRecordApi.Contributions}?${params.toString()}` });
+};
+
+const getThemes = () => apiClient.get<WorkRecordThemeDetail[]>({ url: WorkRecordApi.Themes });
+
+const createTheme = (data: CreateWorkRecordThemeReq) =>
+	apiClient.post<WorkRecordThemeDetail>({ url: WorkRecordApi.Themes, data });
+
 const getRecordDetail = (id: string | number) => apiClient.get<WorkRecordDetail>({ url: `${WorkRecordApi.Records}/${id}` });
 
 const createRecord = (data: CreateWorkRecordReq) => apiClient.post<WorkRecordDetail>({ url: WorkRecordApi.Records, data });
@@ -121,30 +140,40 @@ const importRecords = (data: ImportWorkRecordsReq | CreateWorkRecordReq[]) =>
 	apiClient.post<ImportWorkRecordsRes>({ url: WorkRecordApi.Import, data });
 
 const exportRecords = async ({ startDate, endDate, format = "json" }: ExportWorkRecordsReq): Promise<ExportWorkRecordsRes> => {
-	const params = new URLSearchParams({ startDate, endDate, format });
 	const accessToken = userStore.getState().userToken.accessToken;
-	const response = await fetch(joinApiUrl(`${WorkRecordApi.Export}?${params.toString()}`), {
-		method: "GET",
-		headers: {
-			...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-		},
-	});
-
-	if (!response.ok) {
-		let message = `Failed to export work records (${response.status})`;
-		try {
-			const payload = (await response.json()) as { message?: string };
-			if (payload?.message) message = payload.message;
-		} catch {
-			// ignore parse error
+	let response;
+	try {
+		response = await axios.get<Blob>(WorkRecordApi.Export, {
+			baseURL: GLOBAL_CONFIG.apiBaseUrl,
+			params: { startDate, endDate, format },
+			responseType: "blob",
+			headers: accessToken
+				? {
+					Authorization: `Bearer ${accessToken}`,
+				}
+				: undefined,
+		});
+	} catch (error) {
+		let message = "Failed to export work records";
+		if (axios.isAxiosError(error)) {
+			message = `Failed to export work records (${error.response?.status ?? "network"})`;
+			const blob = error.response?.data;
+			if (blob instanceof Blob) {
+				try {
+					const payload = JSON.parse(await blob.text()) as { message?: string };
+					if (payload?.message) message = payload.message;
+				} catch {
+					// ignore parse error
+				}
+			}
 		}
 		throw new Error(message);
 	}
 
-	const blob = await response.blob();
+	const blob = response.data;
 	const fallback = `work-records_${startDate}_${endDate}.${format}`;
-	const fileName = parseFileName(response.headers.get("content-disposition"), fallback);
-	const contentType = response.headers.get("content-type") || blob.type;
+	const fileName = parseFileName((response.headers["content-disposition"] as string | null) ?? null, fallback);
+	const contentType = (response.headers["content-type"] as string | undefined) || blob.type;
 
 	return {
 		blob,
@@ -155,7 +184,10 @@ const exportRecords = async ({ startDate, endDate, format = "json" }: ExportWork
 
 export default {
 	getCalendarSummary,
+	getContributions,
 	getRecordsByDate,
+	getThemes,
+	createTheme,
 	getRecordDetail,
 	createRecord,
 	deleteRecord,

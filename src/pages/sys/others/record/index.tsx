@@ -1,11 +1,11 @@
-import { Button, Calendar, Card, Flex, message, Space, Tooltip, Typography } from "antd";
+import { Button, Calendar, Card, Flex, message, Popover, Space, Spin, Tooltip, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import styled from "styled-components";
-import type { CreateWorkRecordReq } from "@/api/services/workRecordService";
+import type { CreateWorkRecordReq, WorkRecordContributionItem } from "@/api/services/workRecordService";
 import workRecordService from "@/api/services/workRecordService";
 import { Icon } from "@/components/icon";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -13,28 +13,19 @@ import { themeVars } from "@/theme/theme.css";
 import {
 	type CalendarCellRecord,
 	mapCalendarSummaryItem,
+	mapThemeListToOptions,
 	mapWorkRecordDetail,
-	mergeThemesFromRecords,
 	parseImportRecordsPayload,
+	resolveThemeIdByThemeValue,
 } from "./api-adapter";
 import { ExportModal } from "./export-modal";
-import { type ExportFormat } from "./export-records";
+import { ContributionGraph } from "./contribution-graph";
+import { exportRecords, type ExportFormat } from "./export-records";
 import { type CreateRecordFormPayload, RecordFormModal } from "./record-form-modal";
 import { RecordList } from "./record-list";
-import { compareWorkRecords, getRecordTheme, type RecordThemeOption, type WorkRecord } from "./types";
+import { compareWorkRecords, getRecordTheme, getRecordThemeLabel, type RecordThemeOption, type WorkRecord } from "./types";
 
 const dateKey = (date: Dayjs) => date.format("YYYY-MM-DD");
-
-const triggerDownload = (blob: Blob, fileName: string) => {
-	const url = URL.createObjectURL(blob);
-	const anchor = document.createElement("a");
-	anchor.href = url;
-	anchor.download = fileName;
-	document.body.appendChild(anchor);
-	anchor.click();
-	document.body.removeChild(anchor);
-	setTimeout(() => URL.revokeObjectURL(url), 1000);
-};
 
 export default function RecordPage() {
 	const { t, i18n } = useTranslation();
@@ -43,13 +34,20 @@ export default function RecordPage() {
 	const [selectedDate, setSelectedDate] = useState(dayjs());
 	const [calendarRecords, setCalendarRecords] = useState<CalendarCellRecord[]>([]);
 	const [dayRecords, setDayRecords] = useState<WorkRecord[]>([]);
+	const [hoverRecordsByDate, setHoverRecordsByDate] = useState<Record<string, WorkRecord[]>>({});
+	const [hoverLoadingDates, setHoverLoadingDates] = useState<Set<string>>(() => new Set());
 	const [themes, setThemes] = useState<RecordThemeOption[]>([]);
 	const [calendarLoading, setCalendarLoading] = useState(false);
 	const [dayLoading, setDayLoading] = useState(false);
 	const [exportCount, setExportCount] = useState(0);
+	const [contributions, setContributions] = useState<WorkRecordContributionItem[]>([]);
+	const [contributionsLoading, setContributionsLoading] = useState(false);
+	const [contributionYear, setContributionYear] = useState(dayjs().year());
+	const contributionYears = useMemo(() => Array.from({ length: 5 }, (_, index) => dayjs().year() - index), []);
 
 	const [createOpen, setCreateOpen] = useState(false);
 	const [exportOpen, setExportOpen] = useState(false);
+	const [mobilePopoverDate, setMobilePopoverDate] = useState<string | null>(null);
 	const [exportRange, setExportRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf("month"), dayjs()]);
 	const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
 
@@ -60,16 +58,39 @@ export default function RecordPage() {
 	const summaryByDate = useMemo(() => {
 		const result = new Map<string, CalendarCellRecord[]>();
 		for (const record of calendarRecords) {
+			if (!record.date) continue;
 			result.set(record.date, [...(result.get(record.date) ?? []), record]);
 		}
 		return result;
 	}, [calendarRecords]);
 
+	const loadHoverRecords = async (date: string) => {
+		if (hoverRecordsByDate[date] || hoverLoadingDates.has(date)) return;
+		setHoverLoadingDates((previous) => new Set(previous).add(date));
+		try {
+			const records = await workRecordService.getRecordsByDate(date);
+			const normalized = records.map(mapWorkRecordDetail).sort(compareWorkRecords);
+			setHoverRecordsByDate((previous) => ({ ...previous, [date]: normalized }));
+		} finally {
+			setHoverLoadingDates((previous) => {
+				const next = new Set(previous);
+				next.delete(date);
+				return next;
+			});
+		}
+	};
+
+	const loadThemeList = useCallback(async () => {
+		const themeList = await workRecordService.getThemes();
+		setThemes(mapThemeListToOptions(themeList));
+	}, []);
+
 	const loadCalendarSummary = useCallback(async (startDate: string, endDate: string) => {
 		setCalendarLoading(true);
 		try {
 			const records = await workRecordService.getCalendarSummary({ startDate, endDate });
-			setCalendarRecords(records.map(mapCalendarSummaryItem));
+			const mappedSummary = records.map(mapCalendarSummaryItem).filter((item) => item.date);
+			setCalendarRecords(mappedSummary);
 		} finally {
 			setCalendarLoading(false);
 		}
@@ -81,7 +102,7 @@ export default function RecordPage() {
 			const records = await workRecordService.getRecordsByDate(date);
 			const normalized = records.map(mapWorkRecordDetail).sort(compareWorkRecords);
 			setDayRecords(normalized);
-			setThemes((previous) => mergeThemesFromRecords(normalized, previous));
+			setHoverRecordsByDate((previous) => ({ ...previous, [date]: normalized }));
 		} finally {
 			setDayLoading(false);
 		}
@@ -98,9 +119,22 @@ export default function RecordPage() {
 		}
 	}, []);
 
+	const loadContributions = useCallback(async () => {
+		setContributionsLoading(true);
+		try {
+			setContributions(await workRecordService.getContributions(contributionYear));
+		} finally {
+			setContributionsLoading(false);
+		}
+	}, [contributionYear]);
+
 	useEffect(() => {
 		void loadCalendarSummary(monthStart, monthEnd);
 	}, [loadCalendarSummary, monthEnd, monthStart]);
+
+	useEffect(() => {
+		void loadThemeList();
+	}, [loadThemeList]);
 
 	useEffect(() => {
 		void loadDayRecords(selectedDateKey);
@@ -110,20 +144,38 @@ export default function RecordPage() {
 		void loadExportCount(exportRange);
 	}, [exportRange, loadExportCount]);
 
+	useEffect(() => {
+		void loadContributions();
+	}, [loadContributions]);
+
 	const reloadData = useCallback(async () => {
 		await Promise.all([
 			loadDayRecords(selectedDateKey),
 			loadCalendarSummary(monthStart, monthEnd),
+			loadThemeList(),
 			loadExportCount(exportRange),
+			loadContributions(),
 		]);
-	}, [exportRange, loadCalendarSummary, loadDayRecords, loadExportCount, monthEnd, monthStart, selectedDateKey]);
+	}, [exportRange, loadCalendarSummary, loadContributions, loadDayRecords, loadExportCount, loadThemeList, monthEnd, monthStart, selectedDateKey]);
 
-	const selectDate = (date: Dayjs, source: string) => {
+	const selectDate = (date: Dayjs) => {
 		setSelectedDate(date);
-		if (isMobile && source === "date") navigate(`/record/day/${dateKey(date)}`);
+	};
+
+	const openCreateModalForDate = (date: Dayjs) => {
+		if (isMobile) setMobilePopoverDate(null);
+		setSelectedDate(date);
+		setCreateOpen(true);
+	};
+
+	const goDayDetail = (date: string) => {
+		if (isMobile) setMobilePopoverDate(null);
+		navigate(`/record/day/${date}`);
 	};
 
 	const handleCreate = async (value: CreateRecordFormPayload) => {
+		const selectedTheme = value.theme;
+		const resolvedThemeId = resolveThemeIdByThemeValue(selectedTheme);
 		const payload: CreateWorkRecordReq = {
 			recordDate: value.date,
 			title: value.title,
@@ -132,11 +184,10 @@ export default function RecordPage() {
 			endTime: value.endTime,
 		};
 
-		if (value.theme && /^\d+$/.test(value.theme)) {
-			payload.themeId = Number(value.theme);
-		}
+		if (resolvedThemeId) payload.themeId = resolvedThemeId;
 
 		await workRecordService.createRecord(payload);
+
 		setCreateOpen(false);
 		message.success(t("sys.record.recordSaved"));
 		await reloadData();
@@ -152,9 +203,22 @@ export default function RecordPage() {
 		}
 	};
 
+	const addTheme = async (theme: RecordThemeOption) => {
+		const created = await workRecordService.createTheme({
+			themeName: theme.label,
+			color: theme.color,
+		});
+		const createdOption = mapThemeListToOptions([created])[0];
+		setThemes((previous) => {
+			const filtered = previous.filter((item) => item.value !== createdOption.value);
+			return [...filtered, createdOption];
+		});
+		return createdOption;
+	};
+
 	const handleImport = async (file: File) => {
 		try {
-			const raw = JSON.parse(await file.text()) as unknown;
+			const raw = JSON.parse((await file.text()).replace(/^\uFEFF/, "")) as unknown;
 			const records = parseImportRecordsPayload(raw, themes);
 			if (!records.length) throw new Error("empty");
 
@@ -176,31 +240,37 @@ export default function RecordPage() {
 
 		const startDate = exportRange[0].format("YYYY-MM-DD");
 		const endDate = exportRange[1].format("YYYY-MM-DD");
+		const pdfWindow = exportFormat === "pdf" ? window.open("", "_blank") : null;
+		if (exportFormat === "pdf" && !pdfWindow) {
+			message.error(t("sys.record.export.popupBlocked"));
+			return;
+		}
 
 		try {
-			const result = await workRecordService.exportRecords({
-				startDate,
-				endDate,
-				format: exportFormat,
-			});
+			const summaries = await workRecordService.getCalendarSummary({ startDate, endDate });
+			const dates = [
+				...new Set(
+					summaries
+						.map(mapCalendarSummaryItem)
+						.map((item) => item.date)
+						.filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)),
+				),
+			];
+			const details = await Promise.all(dates.map((date) => workRecordService.getRecordsByDate(date)));
+			const records = details.flat().map(mapWorkRecordDetail).sort((a, b) => a.date.localeCompare(b.date) || compareWorkRecords(a, b));
+			const range = `${startDate}_${endDate}`;
+			const exported = exportRecords(records, themes, range, exportFormat, pdfWindow);
+			if (!exported) throw new Error(t("sys.record.export.popupBlocked"));
 
-			if (exportFormat === "pdf") {
-				const url = URL.createObjectURL(result.blob);
-				const popup = window.open(url, "_blank", "noopener,noreferrer");
-				if (!popup) {
-					URL.revokeObjectURL(url);
-					message.error(t("sys.record.export.popupBlocked"));
-					return;
-				}
-				setTimeout(() => URL.revokeObjectURL(url), 30_000);
-				message.success(t("sys.record.export.pdfOpened"));
-			} else {
-				triggerDownload(result.blob, result.fileName);
-				message.success(t("sys.record.export.exported", { count: exportCount }));
-			}
+			message.success(
+				exportFormat === "pdf"
+					? t("sys.record.export.pdfOpened")
+					: t("sys.record.export.exported", { count: records.length }),
+			);
 
 			setExportOpen(false);
 		} catch (error) {
+			pdfWindow?.close();
 			const errorMessage = error instanceof Error ? error.message : t("sys.api.errorMessage");
 			message.error(errorMessage);
 		}
@@ -226,7 +296,7 @@ export default function RecordPage() {
 				<CalendarCard styles={{ body: { padding: isMobile ? 8 : 16 } }} loading={calendarLoading}>
 					<Calendar
 						value={selectedDate}
-						onSelect={(date, info) => selectDate(date, info.source)}
+						onSelect={(date) => selectDate(date)}
 						headerRender={({ value, onChange }) => (
 							<CalendarHeader>
 								<Space size={2}>
@@ -299,24 +369,43 @@ export default function RecordPage() {
 							if (info.type !== "date") return info.originNode;
 
 							const key = dateKey(date);
-							const summaryItems = summaryByDate.get(key) ?? [];
-							const items =
-								key === selectedDateKey
-									? dayRecords.map((record) => ({
-										id: record.id,
-										color: record.themeColor ?? getRecordTheme(record.theme, themes).color,
-										title: record.title,
-									}))
-									: summaryItems;
+							const dotItems = summaryByDate.get(key) ?? [];
+							const hoverRecords = hoverRecordsByDate[key];
+							const openCreateModal = () => {
+								openCreateModalForDate(date);
+							};
+							const hoverContent = (
+								<HoverContent>
+									<HoverRecordList $rows={dotItems.length}>
+										{(!hoverRecords || hoverLoadingDates.has(key)) && (
+											<HoverLoading><Spin size="small" /></HoverLoading>
+										)}
+										{(hoverRecords ?? []).map((record) => {
+											const theme = getRecordTheme(record.theme, themes);
+											return (
+												<HoverRecord key={record.id}>
+													<HoverTheme $color={record.themeColor ?? theme.color}>
+														{record.themeName ?? getRecordThemeLabel(theme, (translationKey) => t(translationKey))}
+													</HoverTheme>
+													<HoverTitle>{record.title}</HoverTitle>
+												</HoverRecord>
+											);
+										})}
+									</HoverRecordList>
+									{isMobile && (
+										<HoverActions>
+											<Button type="primary" block size="small" onClick={openCreateModal}>
+												{t("sys.record.new")}
+											</Button>
+											<Button block size="small" onClick={() => goDayDetail(key)}>
+												{t("sys.record.dayDetail")}
+											</Button>
+										</HoverActions>
+									)}
+								</HoverContent>
+							);
 
-							const tooltip = items.some((item) => "title" in item && item.title)
-								? items
-										.filter((item): item is { id: string; color: string; title: string } => "title" in item && !!item.title)
-										.map((item) => item.title)
-										.join("\n")
-								: t("sys.record.dayRecordCount", { count: items.length });
-
-							return (
+							const cell = (
 								<DateCell
 									$selected={date.isSame(selectedDate, "day")}
 									$today={date.isSame(dayjs(), "day")}
@@ -324,26 +413,44 @@ export default function RecordPage() {
 								>
 									<DateNumber>{date.date()}</DateNumber>
 									{!isMobile && (
-										<QuickAdd
-											type="text"
-											size="small"
-											icon={<Icon icon="solar:add-circle-linear" size={17} />}
-											onClick={(event) => {
-												event.stopPropagation();
-												setSelectedDate(date);
-												setCreateOpen(true);
-											}}
-											aria-label={t("sys.record.addOnDate", { date: key })}
-										/>
-									)}
-									<CellRecords aria-label={t("sys.record.viewDate", { date: key })} title={tooltip}>
-										{items.slice(0, 4).map((record) => (
+									<QuickAdd
+										type="text"
+										size="small"
+										icon={<Icon icon="solar:add-circle-linear" size={17} />}
+										onClick={(event) => {
+											event.stopPropagation();
+											openCreateModal();
+										}}
+										aria-label={t("sys.record.addOnDate", { date: key })}
+									/>
+								)}
+									<CellRecords aria-label={t("sys.record.viewDate", { date: key })}>
+										{dotItems.slice(0, 4).map((record) => (
 											<i key={record.id} aria-hidden="true" style={{ background: record.color }} />
 										))}
-										{items.length > 4 && <span aria-hidden="true">…</span>}
+										{dotItems.length > 4 && <span aria-hidden="true">…</span>}
 									</CellRecords>
 								</DateCell>
 							);
+
+							return dotItems.length ? (
+								<Popover
+									key={key}
+									content={hoverContent}
+									title={`${key} · ${t("sys.record.dayRecordCount", { count: dotItems.length })}`}
+									trigger={isMobile ? "click" : "hover"}
+									open={isMobile ? mobilePopoverDate === key : undefined}
+									placement="top"
+									mouseEnterDelay={0.25}
+									destroyTooltipOnHide
+									onOpenChange={(open) => {
+										if (open) void loadHoverRecords(key);
+										if (isMobile) setMobilePopoverDate(open ? key : null);
+									}}
+								>
+									{cell}
+								</Popover>
+							) : cell;
 						}}
 					/>
 				</CalendarCard>
@@ -385,11 +492,20 @@ export default function RecordPage() {
 				)}
 			</Workspace>
 
+			<ContributionGraph
+				items={contributions}
+				loading={contributionsLoading}
+				year={contributionYear}
+				years={contributionYears}
+				onYearChange={setContributionYear}
+			/>
+
 			<RecordFormModal
 				open={createOpen}
 				date={selectedDate}
 				themes={themes}
 				onCancel={() => setCreateOpen(false)}
+				onAddTheme={addTheme}
 				onImport={handleImport}
 				onCreate={handleCreate}
 			/>
@@ -459,6 +575,50 @@ const DateNumber = styled.span`
 const QuickAdd = styled(
 	Button,
 )`&& { position: absolute; top: 6px; right: 5px; opacity: 0; transition: opacity 160ms ease; } @media (max-width: 767px) { display: none; }`;
+const HoverContent = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+`;
+const HoverRecordList = styled.div<{ $rows: number }>`
+	position: relative;
+	display: flex;
+	width: 260px;
+	height: ${({ $rows }) => `${Math.min(Math.max($rows, 1), 8) * 32 - 8}px`};
+	flex-direction: column;
+	gap: 8px;
+	overflow-y: auto;
+	@media (max-width: 767px) { width: min(260px, calc(100vw - 56px)); }
+`;
+const HoverActions = styled.div`
+	display: flex;
+	gap: 8px;
+	.ant-btn { flex: 1; }
+`;
+const HoverLoading = styled.div`
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: ${themeVars.colors.background.paper};
+`;
+const HoverRecord = styled.div`display: grid; min-height: 24px; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px;`;
+const HoverTheme = styled.span<{ $color: string }>`
+	max-width: 90px;
+	padding: 2px 7px;
+	overflow: hidden;
+	border-radius: 999px;
+	color: ${({ $color }) => $color};
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 18px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	background: ${({ $color }) => `color-mix(in srgb, ${$color} 12%, white)`};
+`;
+const HoverTitle = styled.span`overflow: hidden; color: ${themeVars.colors.text.primary}; font-size: 13px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap;`;
 const CellRecords = styled.div`
 	position: absolute;
 	right: 10px;
