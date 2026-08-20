@@ -1,7 +1,7 @@
 import { Button, Calendar, Card, Flex, message, Popover, Space, Spin, Tooltip, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import styled from "styled-components";
@@ -31,11 +31,14 @@ export default function RecordPage() {
 	const { t, i18n } = useTranslation();
 	const navigate = useNavigate();
 	const isMobile = useMediaQuery({ maxWidth: 767 });
+	const calendarRequestIdRef = useRef(0);
+	const calendarCardRef = useRef<HTMLDivElement>(null);
+	const createOpenRef = useRef(false);
+	const hoverLoadingDatesRef = useRef(new Set<string>());
 	const [selectedDate, setSelectedDate] = useState(dayjs());
 	const [calendarRecords, setCalendarRecords] = useState<CalendarCellRecord[]>([]);
 	const [dayRecords, setDayRecords] = useState<WorkRecord[]>([]);
 	const [hoverRecordsByDate, setHoverRecordsByDate] = useState<Record<string, WorkRecord[]>>({});
-	const [hoverLoadingDates, setHoverLoadingDates] = useState<Set<string>>(() => new Set());
 	const [themes, setThemes] = useState<RecordThemeOption[]>([]);
 	const [calendarLoading, setCalendarLoading] = useState(false);
 	const [dayLoading, setDayLoading] = useState(false);
@@ -47,11 +50,13 @@ export default function RecordPage() {
 
 	const [createOpen, setCreateOpen] = useState(false);
 	const [exportOpen, setExportOpen] = useState(false);
-	const [mobilePopoverDate, setMobilePopoverDate] = useState<string | null>(null);
+	const [openPopoverDate, setOpenPopoverDate] = useState<string | null>(null);
+	const [dotCapacity, setDotCapacity] = useState({ full: 3, withEllipsis: 2 });
 	const [exportRange, setExportRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf("month"), dayjs()]);
 	const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
 
 	const selectedDateKey = dateKey(selectedDate);
+	const todayKey = dayjs().format("YYYY-MM-DD");
 	const monthStart = selectedDate.startOf("month").format("YYYY-MM-DD");
 	const monthEnd = selectedDate.endOf("month").format("YYYY-MM-DD");
 
@@ -59,26 +64,27 @@ export default function RecordPage() {
 		const result = new Map<string, CalendarCellRecord[]>();
 		for (const record of calendarRecords) {
 			if (!record.date) continue;
-			result.set(record.date, [...(result.get(record.date) ?? []), record]);
+			const current = result.get(record.date);
+			if (current) {
+				current.push(record);
+			} else {
+				result.set(record.date, [record]);
+			}
 		}
 		return result;
 	}, [calendarRecords]);
 
-	const loadHoverRecords = async (date: string) => {
-		if (hoverRecordsByDate[date] || hoverLoadingDates.has(date)) return;
-		setHoverLoadingDates((previous) => new Set(previous).add(date));
+	const loadHoverRecords = useCallback(async (date: string) => {
+		if (hoverRecordsByDate[date] || hoverLoadingDatesRef.current.has(date)) return;
+		hoverLoadingDatesRef.current.add(date);
 		try {
 			const records = await workRecordService.getRecordsByDate(date);
 			const normalized = records.map(mapWorkRecordDetail).sort(compareWorkRecords);
 			setHoverRecordsByDate((previous) => ({ ...previous, [date]: normalized }));
 		} finally {
-			setHoverLoadingDates((previous) => {
-				const next = new Set(previous);
-				next.delete(date);
-				return next;
-			});
+			hoverLoadingDatesRef.current.delete(date);
 		}
-	};
+	}, [hoverRecordsByDate]);
 
 	const loadThemeList = useCallback(async () => {
 		const themeList = await workRecordService.getThemes();
@@ -86,13 +92,17 @@ export default function RecordPage() {
 	}, []);
 
 	const loadCalendarSummary = useCallback(async (startDate: string, endDate: string) => {
+		const requestId = ++calendarRequestIdRef.current;
 		setCalendarLoading(true);
 		try {
 			const records = await workRecordService.getCalendarSummary({ startDate, endDate });
+			if (requestId !== calendarRequestIdRef.current) return;
 			const mappedSummary = records.map(mapCalendarSummaryItem).filter((item) => item.date);
 			setCalendarRecords(mappedSummary);
 		} finally {
-			setCalendarLoading(false);
+			if (requestId === calendarRequestIdRef.current) {
+				setCalendarLoading(false);
+			}
 		}
 	}, []);
 
@@ -137,8 +147,9 @@ export default function RecordPage() {
 	}, [loadThemeList]);
 
 	useEffect(() => {
+		if (isMobile) return;
 		void loadDayRecords(selectedDateKey);
-	}, [loadDayRecords, selectedDateKey]);
+	}, [isMobile, loadDayRecords, selectedDateKey]);
 
 	useEffect(() => {
 		void loadExportCount(exportRange);
@@ -147,6 +158,39 @@ export default function RecordPage() {
 	useEffect(() => {
 		void loadContributions();
 	}, [loadContributions]);
+
+	useEffect(() => {
+		const calendarCard = calendarCardRef.current;
+		if (!calendarCard) return;
+
+		const updateDotCapacity = () => {
+			const cell = calendarCard.querySelector<HTMLElement>(".ant-picker-cell-in-view [data-record-date-cell='true']");
+			if (!cell) {
+				setDotCapacity(isMobile ? { full: 2, withEllipsis: 1 } : { full: 3, withEllipsis: 2 });
+				return;
+			}
+
+			const records = cell.querySelector<HTMLElement>("[data-record-dots='true']");
+			if (!records) return;
+			const styles = getComputedStyle(records);
+			const width = records.clientWidth;
+			const gap = Number.parseFloat(styles.columnGap) || 0;
+			const dotSize = Number.parseFloat(styles.getPropertyValue("--record-dot-size")) || 5;
+			const ellipsisWidth = Number.parseFloat(styles.getPropertyValue("--record-ellipsis-width")) || 11;
+			const full = Math.max(0, Math.floor((width + gap) / (dotSize + gap)));
+			const withEllipsis = Math.max(0, Math.floor((width - ellipsisWidth) / (dotSize + gap)));
+			setDotCapacity({ full, withEllipsis });
+		};
+
+		requestAnimationFrame(updateDotCapacity);
+		const resizeObserver = new ResizeObserver(updateDotCapacity);
+		resizeObserver.observe(calendarCard);
+		window.addEventListener("resize", updateDotCapacity);
+		return () => {
+			resizeObserver.disconnect();
+			window.removeEventListener("resize", updateDotCapacity);
+		};
+	}, [isMobile, selectedDate, calendarRecords.length]);
 
 	const reloadData = useCallback(async () => {
 		await Promise.all([
@@ -158,18 +202,36 @@ export default function RecordPage() {
 		]);
 	}, [exportRange, loadCalendarSummary, loadContributions, loadDayRecords, loadExportCount, loadThemeList, monthEnd, monthStart, selectedDateKey]);
 
-	const selectDate = (date: Dayjs) => {
-		setSelectedDate(date);
+	const selectDate = useCallback((date: Dayjs) => {
+		setSelectedDate((previous) => (previous.isSame(date, "day") ? previous : date));
+	}, []);
+
+	const updateOpenPopoverDate = (date: string | null) => {
+		setOpenPopoverDate(date);
+	};
+
+	const openDatePopover = useCallback((key: string) => {
+		if (createOpenRef.current) return;
+		setSelectedDate(dayjs(key));
+		setOpenPopoverDate(key);
+		requestAnimationFrame(() => {
+			void loadHoverRecords(key);
+		});
+	}, [loadHoverRecords]);
+
+	const closePopoverImmediately = () => {
+		updateOpenPopoverDate(null);
 	};
 
 	const openCreateModalForDate = (date: Dayjs) => {
-		if (isMobile) setMobilePopoverDate(null);
 		setSelectedDate(date);
+		createOpenRef.current = true;
+		closePopoverImmediately();
 		setCreateOpen(true);
 	};
 
 	const goDayDetail = (date: string) => {
-		if (isMobile) setMobilePopoverDate(null);
+		updateOpenPopoverDate(null);
 		navigate(`/record/day/${date}`);
 	};
 
@@ -188,6 +250,7 @@ export default function RecordPage() {
 
 		await workRecordService.createRecord(payload);
 
+		createOpenRef.current = false;
 		setCreateOpen(false);
 		message.success(t("sys.record.recordSaved"));
 		await reloadData();
@@ -224,6 +287,8 @@ export default function RecordPage() {
 
 			const result = await workRecordService.importRecords({ records });
 			message.success(t("sys.record.importSuccess", { count: result.succeeded }));
+			createOpenRef.current = false;
+			setCreateOpen(false);
 			await reloadData();
 		} catch {
 			message.error(t("sys.record.importFailed"));
@@ -293,10 +358,13 @@ export default function RecordPage() {
 			</Flex>
 
 			<Workspace>
-				<CalendarCard styles={{ body: { padding: isMobile ? 8 : 16 } }} loading={calendarLoading}>
+				<CalendarCard ref={calendarCardRef} styles={{ body: { padding: isMobile ? 8 : 16 } }}>
+					<CalendarLoadingMask $show={calendarLoading}>
+                        <Spin size="large" />
+                    </CalendarLoadingMask>
 					<Calendar
 						value={selectedDate}
-						onSelect={(date) => selectDate(date)}
+						onSelect={selectDate}
 						headerRender={({ value, onChange }) => (
 							<CalendarHeader>
 								<Space size={2}>
@@ -307,7 +375,7 @@ export default function RecordPage() {
 											onClick={() => {
 												const previous = value.subtract(1, "year");
 												onChange(previous);
-												setSelectedDate(previous);
+												selectDate(previous);
 											}}
 											aria-label={t("sys.record.previousYear")}
 										/>
@@ -319,7 +387,7 @@ export default function RecordPage() {
 											onClick={() => {
 												const previous = value.subtract(1, "month");
 												onChange(previous);
-												setSelectedDate(previous);
+												selectDate(previous);
 											}}
 											aria-label={t("sys.record.previousMonth")}
 										/>
@@ -333,7 +401,7 @@ export default function RecordPage() {
 										onClick={() => {
 											const today = dayjs();
 											onChange(today);
-											setSelectedDate(today);
+											selectDate(today);
 										}}
 									>
 										{t("sys.record.today")}
@@ -345,7 +413,7 @@ export default function RecordPage() {
 											onClick={() => {
 												const next = value.add(1, "month");
 												onChange(next);
-												setSelectedDate(next);
+												selectDate(next);
 											}}
 											aria-label={t("sys.record.nextMonth")}
 										/>
@@ -357,7 +425,7 @@ export default function RecordPage() {
 											onClick={() => {
 												const next = value.add(1, "year");
 												onChange(next);
-												setSelectedDate(next);
+												selectDate(next);
 											}}
 											aria-label={t("sys.record.nextYear")}
 										/>
@@ -371,13 +439,16 @@ export default function RecordPage() {
 							const key = dateKey(date);
 							const dotItems = summaryByDate.get(key) ?? [];
 							const hoverRecords = hoverRecordsByDate[key];
+							const isPopoverOpen = !createOpen && openPopoverDate === key;
+							const hasHiddenDots = dotItems.length > dotCapacity.full;
+							const visibleDotCount = hasHiddenDots ? dotCapacity.withEllipsis : dotItems.length;
 							const openCreateModal = () => {
 								openCreateModalForDate(date);
 							};
-							const hoverContent = (
+							const hoverContent = isPopoverOpen ? (
 								<HoverContent>
 									<HoverRecordList $rows={dotItems.length}>
-										{(!hoverRecords || hoverLoadingDates.has(key)) && (
+										{!hoverRecords && (
 											<HoverLoading><Spin size="small" /></HoverLoading>
 										)}
 										{(hoverRecords ?? []).map((record) => {
@@ -392,60 +463,64 @@ export default function RecordPage() {
 											);
 										})}
 									</HoverRecordList>
-									{isMobile && (
-										<HoverActions>
-											<Button type="primary" block size="small" onClick={openCreateModal}>
-												{t("sys.record.new")}
-											</Button>
-											<Button block size="small" onClick={() => goDayDetail(key)}>
-												{t("sys.record.dayDetail")}
-											</Button>
-										</HoverActions>
-									)}
+									<HoverActions>
+										<Button type="primary" block size="small" onClick={openCreateModal}>
+											{t("sys.record.new")}
+										</Button>
+										<Button block size="small" onClick={() => goDayDetail(key)}>
+											{t("sys.record.dayDetail")}
+										</Button>
+									</HoverActions>
 								</HoverContent>
-							);
+							) : null;
 
 							const cell = (
 								<DateCell
+									data-record-date-cell="true"
 									$selected={date.isSame(selectedDate, "day")}
-									$today={date.isSame(dayjs(), "day")}
+									$today={key === todayKey}
 									$outside={!date.isSame(selectedDate, "month")}
+									onClick={() => {
+										if (createOpenRef.current || isPopoverOpen) return;
+										openDatePopover(key);
+									}}
 								>
 									<DateNumber>{date.date()}</DateNumber>
-									{!isMobile && (
-									<QuickAdd
-										type="text"
-										size="small"
-										icon={<Icon icon="solar:add-circle-linear" size={17} />}
-										onClick={(event) => {
-											event.stopPropagation();
-											openCreateModal();
-										}}
-										aria-label={t("sys.record.addOnDate", { date: key })}
-									/>
-								)}
-									<CellRecords aria-label={t("sys.record.viewDate", { date: key })}>
-										{dotItems.slice(0, 4).map((record) => (
+									<CellRecords data-record-dots="true" aria-label={t("sys.record.viewDate", { date: key })}>
+										{dotItems.slice(0, visibleDotCount).map((record) => (
 											<i key={record.id} aria-hidden="true" style={{ background: record.color }} />
 										))}
-										{dotItems.length > 4 && <span aria-hidden="true">…</span>}
+										{dotItems.length > visibleDotCount && <span aria-hidden="true">…</span>}
 									</CellRecords>
 								</DateCell>
 							);
 
-							return dotItems.length ? (
+							return isPopoverOpen ? (
 								<Popover
 									key={key}
 									content={hoverContent}
-									title={`${key} · ${t("sys.record.dayRecordCount", { count: dotItems.length })}`}
-									trigger={isMobile ? "click" : "hover"}
-									open={isMobile ? mobilePopoverDate === key : undefined}
+									title={
+										<PopoverTitle>
+											<span>{`${key} · ${t("sys.record.dayRecordCount", { count: dotItems.length })}`}</span>
+											<PopoverCloseButton
+												type="button"
+												aria-label={i18n.resolvedLanguage === "zh_CN" ? "关闭浮窗" : "Close popover"}
+												onPointerDown={(event) => event.stopPropagation()}
+												onClick={(event) => {
+													event.stopPropagation();
+													updateOpenPopoverDate(null);
+												}}
+											>
+												×
+											</PopoverCloseButton>
+										</PopoverTitle>
+									}
+									trigger={[]}
+									open
 									placement="top"
-									mouseEnterDelay={0.25}
-									destroyTooltipOnHide
+									overlayClassName="record-date-popover"
 									onOpenChange={(open) => {
-										if (open) void loadHoverRecords(key);
-										if (isMobile) setMobilePopoverDate(open ? key : null);
+										if (!open) updateOpenPopoverDate(null);
 									}}
 								>
 									{cell}
@@ -456,7 +531,7 @@ export default function RecordPage() {
 				</CalendarCard>
 
 				{!isMobile && (
-					<Card
+					<DayRecordCard
 						loading={dayLoading}
 						title={
 							<DayCardTitle>
@@ -470,11 +545,11 @@ export default function RecordPage() {
 								</Button>
 							</DayCardTitle>
 						}
-						extra={
+							extra={
 							<Button
 								type="primary"
 								icon={<Icon icon="solar:add-circle-bold" size={18} />}
-								onClick={() => setCreateOpen(true)}
+								onClick={() => openCreateModalForDate(selectedDate)}
 							>
 								{t("sys.record.new")}
 							</Button>
@@ -483,12 +558,14 @@ export default function RecordPage() {
 						<RecordList
 							records={dayRecords}
 							themes={themes}
+							enablePagination
+							pageSize={8}
 							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar" } })}
 							onDelete={(id) => {
 								void handleDelete(id);
 							}}
 						/>
-					</Card>
+					</DayRecordCard>
 				)}
 			</Workspace>
 
@@ -498,13 +575,17 @@ export default function RecordPage() {
 				year={contributionYear}
 				years={contributionYears}
 				onYearChange={setContributionYear}
+				onDateSelect={openDatePopover}
 			/>
 
 			<RecordFormModal
 				open={createOpen}
 				date={selectedDate}
 				themes={themes}
-				onCancel={() => setCreateOpen(false)}
+				onCancel={() => {
+					createOpenRef.current = false;
+					setCreateOpen(false);
+				}}
 				onAddTheme={addTheme}
 				onImport={handleImport}
 				onCreate={handleCreate}
@@ -526,15 +607,48 @@ export default function RecordPage() {
 	);
 }
 
-const Page = styled.div`display: flex; flex-direction: column; gap: 24px;`;
-const Workspace = styled.div`display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; @media (max-width: 767px) { grid-template-columns: minmax(0, 1fr); }`;
+const Page = styled.div`
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+`;
+const Workspace = styled.div`display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch; gap: 24px; @media (max-width: 1100px) { grid-template-columns: minmax(0, 1fr); }`;
 const CalendarHeader = styled.div`display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 6px; padding: 4px 0 16px; > :last-child { justify-self: end; }`;
 const DayCardTitle = styled.div`display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; .ant-btn { height: auto; padding: 2px 0 0; font-weight: 400; }`;
+const DayRecordCard = styled(Card)`
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	.ant-card-head { flex: none; }
+	.ant-card-body { display: flex; flex: 1; flex-direction: column; }
+	.ant-list { display: flex; flex: 1; flex-direction: column; }
+	.ant-list-pagination { margin-top: auto; margin-bottom: 0; }
+`;
 const CalendarCard = styled(Card)`
+	position: relative;
+	.ant-card-body {
+		position: relative;
+		contain: layout paint;
+	}
 	.ant-picker-calendar-date { height: auto !important; margin: 3px !important; padding: 0 !important; border: 0 !important; }
 	.ant-picker-calendar-date-content { height: auto !important; overflow: hidden !important; }
 	.ant-picker-cell::before { display: none !important; }
-	@media (max-width: 767px) { .ant-picker-calendar-date { margin: 2px !important; } }
+	@media (max-width: 767px) {
+		.ant-picker-calendar-date { margin: 2px !important; }
+	}
+`;
+const CalendarLoadingMask = styled.div<{ $show: boolean }>`
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgb(255 255 255 / 42%);
+	opacity: ${({ $show }) => ($show ? 1 : 0)};
+	visibility: ${({ $show }) => ($show ? "visible" : "hidden")};
+	pointer-events: none;
+	transition: opacity 120ms ease;
 `;
 const DateCell = styled.div<{ $selected: boolean; $today: boolean; $outside: boolean }>`
 	position: relative;
@@ -565,20 +679,57 @@ const DateNumber = styled.span`
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 28px;
-	height: 28px;
+	width: clamp(18px, 2.1vw, 28px);
+	height: clamp(18px, 2.1vw, 28px);
 	flex: none;
 	border-radius: 50%;
+	font-size: clamp(11px, 0.9vw, 14px);
 	font-weight: 600;
-	@media (max-width: 767px) { width: 22px; height: 22px; font-size: 12px; }
+	line-height: 1;
+	@media (max-width: 767px) {
+		width: 20px;
+		height: 20px;
+		font-size: 12px;
+	}
 `;
-const QuickAdd = styled(
-	Button,
-)`&& { position: absolute; top: 6px; right: 5px; opacity: 0; transition: opacity 160ms ease; } @media (max-width: 767px) { display: none; }`;
 const HoverContent = styled.div`
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+`;
+const PopoverTitle = styled.div`
+	display: flex;
+	min-width: 0;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+`;
+const PopoverCloseButton = styled.button`
+	display: inline-flex;
+	width: 22px;
+	height: 22px;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	color: ${themeVars.colors.text.secondary};
+	font: inherit;
+	font-size: 20px;
+	font-weight: 400;
+	line-height: 1;
+	background: transparent;
+	cursor: pointer;
+	transition: color 120ms ease, background 120ms ease;
+	&:hover {
+		color: ${themeVars.colors.text.primary};
+		background: color-mix(in srgb, ${themeVars.colors.text.primary} 8%, transparent);
+	}
+	&:focus-visible {
+		outline: 2px solid ${themeVars.colors.palette.primary.default};
+		outline-offset: 1px;
+	}
 `;
 const HoverRecordList = styled.div<{ $rows: number }>`
 	position: relative;
@@ -620,30 +771,38 @@ const HoverTheme = styled.span<{ $color: string }>`
 `;
 const HoverTitle = styled.span`overflow: hidden; color: ${themeVars.colors.text.primary}; font-size: 13px; line-height: 20px; text-overflow: ellipsis; white-space: nowrap;`;
 const CellRecords = styled.div`
-	position: absolute;
-	right: 10px;
-	bottom: 7px;
-	left: 10px;
+	--record-dot-size: clamp(4px, 0.45vw, 7px);
+	--record-ellipsis-width: 11px;
+	margin-top: auto;
 	display: flex;
-	height: 16px;
+	min-height: 14px;
 	align-items: center;
 	justify-content: flex-start;
-	gap: 4px;
+	gap: clamp(2px, 0.28vw, 4px);
 	overflow: hidden;
 	color: ${themeVars.colors.text.secondary};
-	font-size: 12px;
-	line-height: 16px;
+	font-size: 11px;
+	line-height: 1;
 	pointer-events: auto;
-	i { display: block; width: 7px; height: 7px; flex: none; border-radius: 50%; }
-	span { height: 12px; flex: none; color: ${themeVars.colors.text.secondary}; font-size: 14px; line-height: 8px; }
+	i {
+		display: block;
+		width: var(--record-dot-size);
+		height: var(--record-dot-size);
+		flex: none;
+		border-radius: 50%;
+	}
+	span {
+		height: 10px;
+		flex: none;
+		color: ${themeVars.colors.text.secondary};
+		font-size: clamp(10px, 0.85vw, 13px);
+		line-height: 1;
+	}
 	@media (max-width: 767px) {
-		right: 2px;
-		bottom: 4px;
-		left: 2px;
-		height: 8px;
+		--record-dot-size: 5px;
+		min-height: 10px;
 		gap: 3px;
-		line-height: 8px;
 		i { width: 5px; height: 5px; }
-		span { height: 9px; font-size: 12px; line-height: 6px; }
+		span { font-size: 11px; }
 	}
 `;

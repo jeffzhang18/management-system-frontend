@@ -294,7 +294,7 @@
 		},
 		"record": {
 			"title": "工作记录",
-			"subtitle": "日历工作台 · 数据保存在当前浏览器",
+			"subtitle": "日历工作台",
 			"exportRecords": "导出记录",
 			"previousYear": "上一年",
 			"previousMonth": "上个月",

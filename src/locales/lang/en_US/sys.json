@@ -294,7 +294,7 @@
 		},
 		"record": {
 			"title": "Work Records",
-			"subtitle": "Calendar workspace · Data is stored in this browser",
+			"subtitle": "Calendar workspace",
 			"exportRecords": "Export Records",
 			"previousYear": "Previous year",
 			"previousMonth": "Previous month",
