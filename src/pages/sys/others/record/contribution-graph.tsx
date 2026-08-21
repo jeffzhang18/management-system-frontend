@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import type { WorkRecordContributionItem } from "@/api/services/workRecordService";
 import { themeVars } from "@/theme/theme.css";
+import { Button } from "@/ui/button";
 
 interface Props {
 	items: WorkRecordContributionItem[];
@@ -224,8 +225,8 @@ const YearList = styled.div`
 	display: flex; flex-direction: column; gap: 4px;
 	@media (max-width: 767px) { width: 100%; min-width: 0; flex-direction: row; gap: 6px; overflow-x: auto; padding: 0 4px 2px; overscroll-behavior-inline: contain; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 `;
-const YearButton = styled.button<{ $active: boolean }>`
-	width: 100%; min-height: 36px; padding: 7px 12px; border: 0; border-radius: 6px; color: ${({ $active }) => ($active ? "#fff" : themeVars.colors.text.secondary)}; font: inherit; font-size: 13px; text-align: left; background: ${({ $active }) => ($active ? themeVars.colors.palette.primary.default : "transparent")}; cursor: pointer;
+const YearButton = styled(Button)<{ $active: boolean }>`
+	width: 100%; min-height: 36px; padding: 7px 12px; border: 0; border-radius: 6px; color: ${({ $active }) => ($active ? "#fff" : themeVars.colors.text.secondary)}; font: inherit; font-size: 13px; text-align: left; background: ${({ $active }) => ($active ? themeVars.colors.palette.primary.default : "transparent")}; box-shadow: none; cursor: pointer;
 	&:hover { color: ${({ $active }) => ($active ? "#fff" : themeVars.colors.text.primary)}; background: ${({ $active }) => ($active ? themeVars.colors.palette.primary.default : `color-mix(in srgb, ${themeVars.colors.text.primary} 7%, transparent)`)}; }
 	@media (max-width: 767px) { width: auto; min-width: 68px; min-height: 40px; flex: none; padding-inline: 14px; text-align: center; }
 `;

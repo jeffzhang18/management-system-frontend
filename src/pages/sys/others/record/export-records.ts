@@ -7,7 +7,7 @@ import {
 	type WorkRecord,
 } from "./types";
 
-export type ExportFormat = "txt" | "pdf" | "json";
+export type ExportFormat = "txt" | "pdf" | "json" | "ai";
 
 const sorted = (records: WorkRecord[]) =>
 	[...records].sort((a, b) => a.date.localeCompare(b.date) || compareWorkRecords(a, b));

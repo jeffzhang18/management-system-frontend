@@ -1,7 +1,8 @@
-import { Button, Empty, List, Popconfirm, Space, Tag, Typography } from "antd";
+import { Empty, List, Popconfirm, Space, Tag, Typography } from "antd";
 import styled from "styled-components";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/components/icon";
+import { Button } from "@/ui/button";
 import { getRecordTheme, getRecordThemeLabel, type RecordThemeOption, type WorkRecord } from "./types";
 
 interface Props {
@@ -18,12 +19,14 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 	if (!records.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("sys.record.emptyDay")} />;
 
 	return (
-		<ListContainer>
+		<ListContainer $pageSize={enablePagination ? pageSize : undefined}>
 			<List
 				className="record-list"
+				data-paginated={enablePagination || undefined}
+				data-single-page={(enablePagination && records.length <= pageSize) || undefined}
 				pagination={
 					enablePagination
-						? { pageSize, size: "small", hideOnSinglePage: true, showSizeChanger: false }
+						? { pageSize, size: "small", hideOnSinglePage: false, showSizeChanger: false }
 						: false
 				}
 				dataSource={records}
@@ -40,15 +43,16 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 										onDelete(record.id);
 									}}
 								>
-									<Button
-										type="text"
-										size="small"
-										danger
-										icon={<Icon icon="solar:trash-bin-trash-bold-duotone" size={16} />}
-										onClick={(event) => event.stopPropagation()}
-										aria-label={t("sys.record.deleteRecord")}
-										style={{ width: 20, minWidth: 20, paddingInline: 0 }}
-									/>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									className="size-5 text-destructive hover:text-destructive"
+									onClick={(event) => event.stopPropagation()}
+									aria-label={t("sys.record.deleteRecord")}
+								>
+									<Icon icon="solar:trash-bin-trash-bold-duotone" size={16} />
+								</Button>
 								</Popconfirm>,
 							]}
 							onClick={() => onSelect(record)}
@@ -56,13 +60,15 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 						>
 							<List.Item.Meta
 								title={
-									<Space>
+									<Space className="record-list-title">
 										<Tag color={theme.color}>{getRecordThemeLabel(theme, t)}</Tag>
-										<Typography.Text strong>{record.title}</Typography.Text>
+										<Typography.Text strong ellipsis={{ tooltip: record.title }}>
+											{record.title}
+										</Typography.Text>
 									</Space>
 								}
 								description={
-									<Typography.Text style={{ display: "block", whiteSpace: "normal", wordBreak: "break-all", overflowWrap: "anywhere" }}>
+									<Typography.Text className="record-list-description">
 										{`${record.startTime ? (record.endTime ? `${record.startTime} - ${record.endTime}` : t("sys.record.fromTime", { time: record.startTime })) : t("sys.record.allDay")}${record.description ? ` · ${record.description.replace(/[#*`>_~[\]()-]/g, "").slice(0, 200)}` : ""}`}
 									</Typography.Text>
 								}
@@ -78,13 +84,61 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 export { RecordList };
 export default RecordList;
 
-const ListContainer = styled.div`
+const ListContainer = styled.div<{ $pageSize?: number }>`
+	display: flex;
+	flex: 1;
+	min-height: 0;
+
+	.record-list.ant-list {
+		display: flex;
+		flex: 1;
+		min-height: 0;
+		flex-direction: column;
+	}
+	.record-list.ant-list > .ant-spin-nested-loading,
+	.record-list.ant-list > .ant-spin-nested-loading > .ant-spin-container {
+		display: flex;
+		flex: 1;
+		min-height: 0;
+		flex-direction: column;
+	}
+	.record-list.ant-list[data-paginated="true"] .ant-list-items {
+		display: grid;
+		flex: 1;
+		min-height: 0;
+		grid-template-rows: repeat(${({ $pageSize }) => $pageSize ?? 1}, minmax(0, 1fr));
+	}
 	.record-list.ant-list .ant-list-item {
-		align-items: flex-start;
+		min-height: 0;
+		align-items: center;
+		overflow: hidden;
 	}
 	.record-list.ant-list .ant-list-item-meta {
 		min-width: 0;
 		margin-inline-end: 0;
+	}
+	.record-list.ant-list .ant-list-item-meta-content,
+	.record-list.ant-list .ant-list-item-meta-title,
+	.record-list.ant-list .ant-list-item-meta-description {
+		min-width: 0;
+		overflow: hidden;
+	}
+	.record-list-title {
+		display: flex;
+		width: 100%;
+		min-width: 0;
+	}
+	.record-list-title .ant-tag {
+		flex: none;
+	}
+	.record-list-title .ant-typography {
+		min-width: 0;
+	}
+	.record-list-description {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.record-list.ant-list .ant-list-item-action {
 		width: 20px;
@@ -97,5 +151,17 @@ const ListContainer = styled.div`
 		width: 20px;
 		margin-inline: 0 !important;
 		padding-inline: 0 !important;
+	}
+	.record-list.ant-list .ant-list-pagination {
+		flex: none;
+		margin-block: 12px 0;
+		text-align: center;
+	}
+	.record-list.ant-list .ant-list-pagination .ant-pagination {
+		justify-content: center;
+	}
+	.record-list.ant-list[data-single-page="true"] .ant-list-pagination {
+		visibility: hidden;
+		pointer-events: none;
 	}
 `;

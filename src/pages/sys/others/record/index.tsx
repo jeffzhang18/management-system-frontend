@@ -1,4 +1,4 @@
-import { Button, Calendar, Card, Flex, message, Popover, Space, Spin, Tooltip, Typography } from "antd";
+import { Calendar, Card, Flex, message, Popover, Space, Spin, Tooltip, Typography } from "antd";
 import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,6 +10,7 @@ import workRecordService from "@/api/services/workRecordService";
 import { Icon } from "@/components/icon";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { themeVars } from "@/theme/theme.css";
+import { Button } from "@/ui/button";
 import {
 	type CalendarCellRecord,
 	mapCalendarSummaryItem,
@@ -19,6 +20,7 @@ import {
 	resolveThemeIdByThemeValue,
 } from "./api-adapter";
 import { ExportModal } from "./export-modal";
+import { AiReportModal } from "./ai-report-modal";
 import { ContributionGraph } from "./contribution-graph";
 import { exportRecords, type ExportFormat } from "./export-records";
 import { type CreateRecordFormPayload, RecordFormModal } from "./record-form-modal";
@@ -50,6 +52,12 @@ export default function RecordPage() {
 
 	const [createOpen, setCreateOpen] = useState(false);
 	const [exportOpen, setExportOpen] = useState(false);
+	const [exportLoading, setExportLoading] = useState(false);
+	const [includeNextWeekPlan, setIncludeNextWeekPlan] = useState(false);
+	const [aiReportOpen, setAiReportOpen] = useState(false);
+	const [aiWeeklyReport, setAiWeeklyReport] = useState("");
+	const [aiNextWeekPlan, setAiNextWeekPlan] = useState("");
+	const [aiNextWeekPlanLoading, setAiNextWeekPlanLoading] = useState(false);
 	const [openPopoverDate, setOpenPopoverDate] = useState<string | null>(null);
 	const [dotCapacity, setDotCapacity] = useState({ full: 3, withEllipsis: 2 });
 	const [exportRange, setExportRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf("month"), dayjs()]);
@@ -158,6 +166,20 @@ export default function RecordPage() {
 	useEffect(() => {
 		void loadContributions();
 	}, [loadContributions]);
+
+	useEffect(() => {
+		if (!openPopoverDate) return;
+
+		const closePopoverOnOutsidePointerDown = (event: PointerEvent) => {
+			const target = event.target;
+			if (!(target instanceof Element)) return;
+			if (target.closest(".record-date-popover") || target.closest('[data-record-date-cell="true"]')) return;
+			setOpenPopoverDate(null);
+		};
+
+		document.addEventListener("pointerdown", closePopoverOnOutsidePointerDown);
+		return () => document.removeEventListener("pointerdown", closePopoverOnOutsidePointerDown);
+	}, [openPopoverDate]);
 
 	useEffect(() => {
 		const calendarCard = calendarCardRef.current;
@@ -305,6 +327,53 @@ export default function RecordPage() {
 
 		const startDate = exportRange[0].format("YYYY-MM-DD");
 		const endDate = exportRange[1].format("YYYY-MM-DD");
+		const range = `${startDate}_${endDate}`;
+		if (exportFormat === "ai") {
+			setExportLoading(true);
+			setAiWeeklyReport("");
+			setAiNextWeekPlan("");
+			try {
+				const language = i18n.resolvedLanguage === "zh_CN" ? "zh-CN" : "en-US";
+				const report = await workRecordService.generateAiReport({
+					startDate,
+					endDate,
+					reportType: "WEEKLY_REPORT",
+					outputFormat: "MARKDOWN",
+					language,
+				});
+				if (!report.trim()) throw new Error(t("sys.record.export.aiEmpty"));
+				setAiWeeklyReport(report);
+				setExportOpen(false);
+				setAiReportOpen(true);
+				message.success(t("sys.record.export.aiGenerated"));
+
+				if (includeNextWeekPlan) {
+					setAiNextWeekPlanLoading(true);
+					try {
+						const nextWeekPlan = await workRecordService.generateAiReport({
+							startDate,
+							endDate,
+							reportType: "NEXT_WEEK_PLAN",
+							outputFormat: "MARKDOWN",
+							language,
+						});
+						if (!nextWeekPlan.trim()) throw new Error(t("sys.record.export.aiEmpty"));
+						setAiNextWeekPlan(nextWeekPlan);
+					} catch (error) {
+						const errorMessage = error instanceof Error ? error.message : t("sys.api.errorMessage");
+						message.error(errorMessage);
+					} finally {
+						setAiNextWeekPlanLoading(false);
+					}
+				}
+			} catch (error) {
+				const errorMessage = error instanceof Error ? error.message : t("sys.api.errorMessage");
+				message.error(errorMessage);
+			} finally {
+				setExportLoading(false);
+			}
+			return;
+		}
 		const pdfWindow = exportFormat === "pdf" ? window.open("", "_blank") : null;
 		if (exportFormat === "pdf" && !pdfWindow) {
 			message.error(t("sys.record.export.popupBlocked"));
@@ -323,7 +392,6 @@ export default function RecordPage() {
 			];
 			const details = await Promise.all(dates.map((date) => workRecordService.getRecordsByDate(date)));
 			const records = details.flat().map(mapWorkRecordDetail).sort((a, b) => a.date.localeCompare(b.date) || compareWorkRecords(a, b));
-			const range = `${startDate}_${endDate}`;
 			const exported = exportRecords(records, themes, range, exportFormat, pdfWindow);
 			if (!exported) throw new Error(t("sys.record.export.popupBlocked"));
 
@@ -351,14 +419,18 @@ export default function RecordPage() {
 					<Typography.Text type="secondary">{t("sys.record.subtitle")}</Typography.Text>
 				</div>
 				<Space wrap>
-					<Button icon={<Icon icon="solar:download-bold-duotone" size={18} />} onClick={() => setExportOpen(true)}>
+					<Button onClick={() => setExportOpen(true)}>
+						<Icon icon="solar:download-bold-duotone" size={18} />
 						{t("sys.record.exportRecords")}
 					</Button>
 				</Space>
 			</Flex>
 
 			<Workspace>
-				<CalendarCard ref={calendarCardRef} styles={{ body: { padding: isMobile ? 8 : 16 } }}>
+				<CalendarCard
+					ref={calendarCardRef}
+					styles={{ body: { padding: isMobile ? "8px 8px 4px" : "12px 16px 8px" } }}
+				>
 					<CalendarLoadingMask $show={calendarLoading}>
                         <Spin size="large" />
                     </CalendarLoadingMask>
@@ -370,27 +442,31 @@ export default function RecordPage() {
 								<Space size={2}>
 									<Tooltip title={t("sys.record.previousYear")}>
 										<Button
-											type="text"
-											icon={<Icon icon="solar:double-alt-arrow-left-linear" size={20} />}
+											variant="ghost"
+											size="icon"
 											onClick={() => {
 												const previous = value.subtract(1, "year");
 												onChange(previous);
 												selectDate(previous);
 											}}
 											aria-label={t("sys.record.previousYear")}
-										/>
+										>
+											<Icon icon="solar:double-alt-arrow-left-linear" size={20} />
+										</Button>
 									</Tooltip>
 									<Tooltip title={t("sys.record.previousMonth")}>
 										<Button
-											type="text"
-											icon={<Icon icon="solar:alt-arrow-left-linear" size={20} />}
+											variant="ghost"
+											size="icon"
 											onClick={() => {
 												const previous = value.subtract(1, "month");
 												onChange(previous);
 												selectDate(previous);
 											}}
 											aria-label={t("sys.record.previousMonth")}
-										/>
+										>
+											<Icon icon="solar:alt-arrow-left-linear" size={20} />
+										</Button>
 									</Tooltip>
 								</Space>
 								<Typography.Title level={4} style={{ margin: 0 }}>
@@ -398,6 +474,8 @@ export default function RecordPage() {
 								</Typography.Title>
 								<Space size={2}>
 									<Button
+										variant="outline"
+										className="bg-white hover:bg-gray-50"
 										onClick={() => {
 											const today = dayjs();
 											onChange(today);
@@ -408,27 +486,31 @@ export default function RecordPage() {
 									</Button>
 									<Tooltip title={t("sys.record.nextMonth")}>
 										<Button
-											type="text"
-											icon={<Icon icon="solar:alt-arrow-right-linear" size={20} />}
+											variant="ghost"
+											size="icon"
 											onClick={() => {
 												const next = value.add(1, "month");
 												onChange(next);
 												selectDate(next);
 											}}
 											aria-label={t("sys.record.nextMonth")}
-										/>
+										>
+											<Icon icon="solar:alt-arrow-right-linear" size={20} />
+										</Button>
 									</Tooltip>
 									<Tooltip title={t("sys.record.nextYear")}>
 										<Button
-											type="text"
-											icon={<Icon icon="solar:double-alt-arrow-right-linear" size={20} />}
+											variant="ghost"
+											size="icon"
 											onClick={() => {
 												const next = value.add(1, "year");
 												onChange(next);
 												selectDate(next);
 											}}
 											aria-label={t("sys.record.nextYear")}
-										/>
+										>
+											<Icon icon="solar:double-alt-arrow-right-linear" size={20} />
+										</Button>
 									</Tooltip>
 								</Space>
 							</CalendarHeader>
@@ -463,14 +545,16 @@ export default function RecordPage() {
 											);
 										})}
 									</HoverRecordList>
-									<HoverActions>
-										<Button type="primary" block size="small" onClick={openCreateModal}>
-											{t("sys.record.new")}
-										</Button>
-										<Button block size="small" onClick={() => goDayDetail(key)}>
+								<HoverActions $single={dotItems.length === 0}>
+									<Button type="button" size="sm" onClick={openCreateModal}>
+										{t("sys.record.new")}
+									</Button>
+									{dotItems.length > 0 && (
+										<Button type="button" size="sm" variant="outline" onClick={() => goDayDetail(key)}>
 											{t("sys.record.dayDetail")}
 										</Button>
-									</HoverActions>
+									)}
+								</HoverActions>
 								</HoverContent>
 							) : null;
 
@@ -532,7 +616,6 @@ export default function RecordPage() {
 
 				{!isMobile && (
 					<DayRecordCard
-						loading={dayLoading}
 						title={
 							<DayCardTitle>
 								<span>
@@ -540,17 +623,16 @@ export default function RecordPage() {
 										? selectedDate.format("M月D日 · dddd")
 										: selectedDate.format("MMMM D · dddd")}
 								</span>
-								<Button type="link" size="small" onClick={() => navigate(`/record/day/${dateKey(selectedDate)}`)}>
+								<Button variant="link" size="sm" onClick={() => navigate(`/record/day/${dateKey(selectedDate)}`)}>
 									{t("sys.record.viewAllToday")}
 								</Button>
 							</DayCardTitle>
 						}
 							extra={
 							<Button
-								type="primary"
-								icon={<Icon icon="solar:add-circle-bold" size={18} />}
 								onClick={() => openCreateModalForDate(selectedDate)}
 							>
+								<Icon icon="solar:add-circle-bold" size={18} />
 								{t("sys.record.new")}
 							</Button>
 						}
@@ -559,12 +641,15 @@ export default function RecordPage() {
 							records={dayRecords}
 							themes={themes}
 							enablePagination
-							pageSize={8}
+							pageSize={5}
 							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar" } })}
-							onDelete={(id) => {
-								void handleDelete(id);
-							}}
-						/>
+								onDelete={(id) => {
+									void handleDelete(id);
+								}}
+							/>
+						<DayLoadingMask $show={dayLoading}>
+							<Spin size="large" />
+						</DayLoadingMask>
 					</DayRecordCard>
 				)}
 			</Workspace>
@@ -593,15 +678,27 @@ export default function RecordPage() {
 
 			<ExportModal
 				open={exportOpen}
+				loading={exportLoading}
+				includeNextWeekPlan={includeNextWeekPlan}
 				range={exportRange}
 				format={exportFormat}
 				count={exportCount}
 				onRangeChange={setExportRange}
 				onFormatChange={setExportFormat}
+				onIncludeNextWeekPlanChange={setIncludeNextWeekPlan}
 				onCancel={() => setExportOpen(false)}
 				onExport={() => {
 					void handleExport();
 				}}
+			/>
+
+			<AiReportModal
+				open={aiReportOpen}
+				weeklyReport={aiWeeklyReport}
+				nextWeekPlan={aiNextWeekPlan}
+				showNextWeekPlan={includeNextWeekPlan}
+				nextWeekPlanLoading={aiNextWeekPlanLoading}
+				onClose={() => setAiReportOpen(false)}
 			/>
 		</Page>
 	);
@@ -613,16 +710,58 @@ const Page = styled.div`
 	gap: 16px;
 `;
 const Workspace = styled.div`display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch; gap: 24px; @media (max-width: 1100px) { grid-template-columns: minmax(0, 1fr); }`;
-const CalendarHeader = styled.div`display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; column-gap: 6px; padding: 4px 0 16px; > :last-child { justify-self: end; }`;
-const DayCardTitle = styled.div`display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; .ant-btn { height: auto; padding: 2px 0 0; font-weight: 400; }`;
+const CalendarHeader = styled.div`
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	align-items: center;
+	column-gap: 6px;
+	padding: 2px 0 10px;
+	> :last-child { justify-self: end; }
+	.ant-typography { white-space: nowrap; }
+	@media (max-width: 767px) {
+		grid-template-columns: auto minmax(0, 1fr) auto;
+		column-gap: 2px;
+		.ant-typography {
+			justify-self: center;
+			font-size: 15px;
+		}
+		.ant-space { gap: 0 !important; }
+		button {
+			width: 28px;
+			height: 28px;
+			min-width: 28px;
+			padding-inline: 0;
+		}
+		> :last-child > .ant-space-item:first-child button {
+			width: auto;
+			padding-inline: 5px;
+			font-size: 12px;
+		}
+	}
+`;
+const DayCardTitle = styled.div`display: flex; flex-direction: column; align-items: flex-start; line-height: 1.3; button { height: auto; padding: 2px 0 0; font-weight: 400; }`;
 const DayRecordCard = styled(Card)`
+	position: relative;
 	height: 100%;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	.ant-card-head { flex: none; }
-	.ant-card-body { display: flex; flex: 1; flex-direction: column; }
-	.ant-list { display: flex; flex: 1; flex-direction: column; }
-	.ant-list-pagination { margin-top: auto; margin-bottom: 0; }
+	.ant-card-body { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+`;
+const DayLoadingMask = styled.div<{ $show: boolean }>`
+	position: absolute;
+	inset: 0;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: inherit;
+	background: rgb(255 255 255 / 58%);
+	opacity: ${({ $show }) => ($show ? 1 : 0)};
+	visibility: ${({ $show }) => ($show ? "visible" : "hidden")};
+	pointer-events: ${({ $show }) => ($show ? "auto" : "none")};
+	transition: opacity 120ms ease;
 `;
 const CalendarCard = styled(Card)`
 	position: relative;
@@ -656,8 +795,8 @@ const DateCell = styled.div<{ $selected: boolean; $today: boolean; $outside: boo
 	flex-direction: column;
 	box-sizing: border-box;
 	width: 100%;
-	aspect-ratio: 1;
-	padding: 10px;
+	height: clamp(54px, 5vw, 68px);
+	padding: 7px 9px;
 	overflow: hidden;
 	border: 1px solid ${({ $selected }) => ($selected ? themeVars.colors.palette.primary.default : "transparent")};
 	border-radius: 12px;
@@ -704,7 +843,7 @@ const PopoverTitle = styled.div`
 	justify-content: space-between;
 	gap: 12px;
 `;
-const PopoverCloseButton = styled.button`
+const PopoverCloseButton = styled(Button)`
 	display: inline-flex;
 	width: 22px;
 	height: 22px;
@@ -720,6 +859,7 @@ const PopoverCloseButton = styled.button`
 	font-weight: 400;
 	line-height: 1;
 	background: transparent;
+	box-shadow: none;
 	cursor: pointer;
 	transition: color 120ms ease, background 120ms ease;
 	&:hover {
@@ -741,10 +881,14 @@ const HoverRecordList = styled.div<{ $rows: number }>`
 	overflow-y: auto;
 	@media (max-width: 767px) { width: min(260px, calc(100vw - 56px)); }
 `;
-const HoverActions = styled.div`
+const HoverActions = styled.div<{ $single: boolean }>`
 	display: flex;
+	justify-content: ${({ $single }) => ($single ? "center" : "stretch")};
 	gap: 8px;
-	.ant-btn { flex: 1; }
+	> button {
+		flex: ${({ $single }) => ($single ? "0 0 132px" : "1")};
+		font-size: 14px;
+	}
 `;
 const HoverLoading = styled.div`
 	position: absolute;

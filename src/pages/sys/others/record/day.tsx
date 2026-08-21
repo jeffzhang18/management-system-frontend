@@ -1,4 +1,4 @@
-import { Button, Card, Flex, message, Typography } from "antd";
+import { Card, Flex, message, Typography } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router";
 import type { CreateWorkRecordReq } from "@/api/services/workRecordService";
 import workRecordService from "@/api/services/workRecordService";
 import { Icon } from "@/components/icon";
+import { Button } from "@/ui/button";
 import {
 	mapThemeListToOptions,
 	mapWorkRecordDetail,
@@ -95,11 +96,13 @@ export default function RecordDayPage() {
 		<div>
 			<Flex align="center" gap={12} style={{ marginBottom: 20 }}>
 				<Button
-					type="text"
-					icon={<Icon icon="solar:arrow-left-linear" size={22} />}
+					variant="ghost"
+					size="icon"
 					onClick={() => navigate("/record")}
 					aria-label={t("sys.record.backCalendar")}
-				/>
+				>
+					<Icon icon="solar:arrow-left-linear" size={22} />
+				</Button>
 				<div style={{ flex: 1 }}>
 					<Typography.Title level={3} style={{ margin: 0 }}>
 						{i18n.resolvedLanguage === "zh_CN"
@@ -110,11 +113,8 @@ export default function RecordDayPage() {
 						{t("sys.record.dayRecordCount", { count: records.length })}
 					</Typography.Text>
 				</div>
-				<Button
-					type="primary"
-					icon={<Icon icon="solar:add-circle-bold" size={18} />}
-					onClick={() => setCreateOpen(true)}
-				>
+				<Button onClick={() => setCreateOpen(true)}>
+					<Icon icon="solar:add-circle-bold" size={18} />
 					{t("sys.record.new")}
 				</Button>
 			</Flex>

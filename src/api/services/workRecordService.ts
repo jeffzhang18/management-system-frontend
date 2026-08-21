@@ -87,6 +87,20 @@ export interface CalendarRangeReq {
 	endDate: string;
 }
 
+export interface GenerateAiReportReq extends CalendarRangeReq {
+	reportType: "WEEKLY_REPORT" | "NEXT_WEEK_PLAN";
+	outputFormat: "MARKDOWN";
+	language: "zh-CN" | "en-US";
+}
+
+type GenerateAiReportRawRes =
+	| string
+	| {
+			content?: string;
+			markdown?: string;
+			report?: string;
+		};
+
 enum WorkRecordApi {
 	Calendar = "/work-records/calendar",
 	Contributions = "/work-records/contributions",
@@ -94,6 +108,7 @@ enum WorkRecordApi {
 	Themes = "/work-records/themes",
 	Export = "/work-records/export",
 	Import = "/work-records/import",
+	GenerateAiReport = "/work-records/ai-report/generate",
 }
 
 const parseFileName = (contentDisposition: string | null, fallback: string) => {
@@ -138,6 +153,12 @@ const deleteRecord = (id: string | number) => apiClient.delete<DeleteWorkRecordR
 
 const importRecords = (data: ImportWorkRecordsReq | CreateWorkRecordReq[]) =>
 	apiClient.post<ImportWorkRecordsRes>({ url: WorkRecordApi.Import, data });
+
+const generateAiReport = async (data: GenerateAiReportReq) => {
+	const response = await apiClient.post<GenerateAiReportRawRes>({ url: WorkRecordApi.GenerateAiReport, data });
+	if (typeof response === "string") return response;
+	return response.content ?? response.markdown ?? response.report ?? "";
+};
 
 const exportRecords = async ({ startDate, endDate, format = "json" }: ExportWorkRecordsReq): Promise<ExportWorkRecordsRes> => {
 	const accessToken = userStore.getState().userToken.accessToken;
@@ -192,6 +213,7 @@ export default {
 	createRecord,
 	deleteRecord,
 	importRecords,
+	generateAiReport,
 	exportRecords,
 };
 
