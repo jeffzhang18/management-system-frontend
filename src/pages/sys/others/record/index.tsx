@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
+import { toast } from "sonner";
 import styled from "styled-components";
 import type { CreateWorkRecordReq, WorkRecordContributionItem } from "@/api/services/workRecordService";
 import workRecordService from "@/api/services/workRecordService";
@@ -28,6 +29,12 @@ import { RecordList } from "./record-list";
 import { compareWorkRecords, getRecordTheme, getRecordThemeLabel, type RecordThemeOption, type WorkRecord } from "./types";
 
 const dateKey = (date: Dayjs) => date.format("YYYY-MM-DD");
+
+const getCurrentWorkweekRange = (): [Dayjs, Dayjs] => {
+	const today = dayjs();
+	const monday = today.subtract((today.day() + 6) % 7, "day").startOf("day");
+	return [monday, monday.add(4, "day")];
+};
 
 export default function RecordPage() {
 	const { t, i18n } = useTranslation();
@@ -60,7 +67,7 @@ export default function RecordPage() {
 	const [aiNextWeekPlanLoading, setAiNextWeekPlanLoading] = useState(false);
 	const [openPopoverDate, setOpenPopoverDate] = useState<string | null>(null);
 	const [dotCapacity, setDotCapacity] = useState({ full: 3, withEllipsis: 2 });
-	const [exportRange, setExportRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf("month"), dayjs()]);
+	const [exportRange, setExportRange] = useState<[Dayjs, Dayjs]>(getCurrentWorkweekRange);
 	const [exportFormat, setExportFormat] = useState<ExportFormat>("txt");
 
 	const selectedDateKey = dateKey(selectedDate);
@@ -302,18 +309,29 @@ export default function RecordPage() {
 	};
 
 	const handleImport = async (file: File) => {
-		try {
+		const importPromise = (async () => {
 			const raw = JSON.parse((await file.text()).replace(/^\uFEFF/, "")) as unknown;
 			const records = parseImportRecordsPayload(raw, themes);
 			if (!records.length) throw new Error("empty");
 
 			const result = await workRecordService.importRecords({ records });
-			message.success(t("sys.record.importSuccess", { count: result.succeeded }));
+			await reloadData();
+			return result;
+		})();
+
+		toast.promise(importPromise, {
+			loading: t("sys.record.importLoading"),
+			success: (result) => t("sys.record.importSuccess", { count: result.succeeded }),
+			error: t("sys.record.importFailed"),
+			position: "top-center",
+		});
+
+		try {
+			await importPromise;
 			createOpenRef.current = false;
 			setCreateOpen(false);
-			await reloadData();
 		} catch {
-			message.error(t("sys.record.importFailed"));
+			// Displayed by the promise toast.
 		}
 
 		return false;

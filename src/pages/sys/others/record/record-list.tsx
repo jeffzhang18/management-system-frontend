@@ -131,8 +131,18 @@ const ListContainer = styled.div<{ $pageSize?: number }>`
 	.record-list-title .ant-tag {
 		flex: none;
 	}
-	.record-list-title .ant-typography {
+	.record-list-title > .ant-space-item:last-child {
+		flex: 1;
 		min-width: 0;
+		overflow: hidden;
+	}
+	.record-list-title .ant-typography {
+		display: block;
+		max-width: 100%;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.record-list-description {
 		display: block;

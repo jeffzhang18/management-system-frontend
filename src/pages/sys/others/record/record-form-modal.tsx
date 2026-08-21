@@ -1,6 +1,5 @@
 import {
 	ColorPicker,
-	DatePicker,
 	Flex,
 	Form,
 	Input,
@@ -15,12 +14,14 @@ import {
 } from "antd";
 import type { Color } from "antd/es/color-picker";
 import type { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { Icon } from "@/components/icon";
 import { themeVars } from "@/theme/theme.css";
 import { Button } from "@/ui/button";
+import { GuidedTimeRangePicker } from "./guided-time-range-picker";
 import { Markdown } from "./markdown";
 import { getRecordThemeLabel, type RecordThemeOption } from "./types";
 
@@ -113,6 +114,10 @@ export function RecordFormModal({
 		if (!current && themes.length > 0) {
 			form.setFieldValue("theme", themes[0].value);
 		}
+		if (!form.getFieldValue("time")) {
+			const start = dayjs().minute(0).second(0).millisecond(0);
+			form.setFieldValue("time", [start, start]);
+		}
 	}, [form, open, themes]);
 
 	const close = () => {
@@ -148,6 +153,7 @@ export function RecordFormModal({
 		<RecordModal
 			title={t("sys.record.form.title", { date: date.format("YYYY-MM-DD") })}
 			open={open}
+			centered
 			onCancel={close}
 			footer={
 				<Flex justify="flex-end" gap={8}>
@@ -159,7 +165,7 @@ export function RecordFormModal({
 					</Button>
 				</Flex>
 			}
-			width={creationMode === "quick" ? 520 : 680}
+			width={creationMode === "quick" ? 520 : 600}
 			destroyOnClose
 		>
 			<CreationSwitch
@@ -268,7 +274,7 @@ export function RecordFormModal({
 							</Form.Item>
 						)}
 						<Form.Item name="time" label={t("sys.record.form.time")}>
-							<DatePicker.RangePicker picker="time" format="HH:mm" minuteStep={5} style={{ width: "100%" }} />
+							<GuidedTimeRangePicker />
 						</Form.Item>
 						<Form.Item
 							label={
@@ -322,7 +328,7 @@ export function RecordFormModal({
 							<Form.Item name="description" noStyle>
 								<Input.TextArea
 									style={{ display: contentMode === "edit" ? "block" : "none" }}
-									rows={9}
+									rows={2}
 									maxLength={5000}
 									showCount
 									placeholder={t("sys.record.form.markdownPlaceholder")}

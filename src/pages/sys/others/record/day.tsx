@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 import type { CreateWorkRecordReq } from "@/api/services/workRecordService";
 import workRecordService from "@/api/services/workRecordService";
 import { Icon } from "@/components/icon";
@@ -79,15 +80,29 @@ export default function RecordDayPage() {
 	};
 
 	const handleImport = async (file: File) => {
-		try {
-			const recordsToImport = parseImportRecordsPayload(JSON.parse(await file.text()) as unknown, themes);
+		const importPromise = (async () => {
+			const raw = JSON.parse((await file.text()).replace(/^\uFEFF/, "")) as unknown;
+			const recordsToImport = parseImportRecordsPayload(raw, themes);
 			if (!recordsToImport.length) throw new Error("empty");
+
 			const result = await workRecordService.importRecords({ records: recordsToImport });
-			message.success(t("sys.record.importSuccess", { count: result.succeeded }));
 			await loadDayRecords();
 			await loadThemeList();
+			return result;
+		})();
+
+		toast.promise(importPromise, {
+			loading: t("sys.record.importLoading"),
+			success: (result) => t("sys.record.importSuccess", { count: result.succeeded }),
+			error: t("sys.record.importFailed"),
+			position: "top-center",
+		});
+
+		try {
+			await importPromise;
+			setCreateOpen(false);
 		} catch {
-			message.error(t("sys.record.importFailed"));
+			// Displayed by the promise toast.
 		}
 		return false;
 	};
