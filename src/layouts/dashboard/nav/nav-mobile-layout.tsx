@@ -31,7 +31,7 @@ export function NavMobileLayout({ data }: NavProps) {
 						<span className="text-xl font-bold">{GLOBAL_CONFIG.appName}</span>
 					</div>
 					<Button type="button" variant="ghost" size="icon" onClick={() => setOpen(false)} aria-label="Close sidebar">
-						<Icon icon="eva:arrow-ios-forward-fill" size={20} />
+						<Icon icon="eva:arrow-ios-back-fill" size={20} />
 					</Button>
 				</div>
 				<ScrollArea className="h-full">
@@ -41,3 +41,4 @@ export function NavMobileLayout({ data }: NavProps) {
 		</Sheet>
 	);
 }
+
