@@ -1,4 +1,4 @@
-import type { MouseEventHandler } from "react";
+import type { MouseEvent as ReactMouseEvent, MouseEventHandler } from "react";
 import { RouterLink } from "@/routes/components/router-link";
 import type { NavItemProps } from "../types";
 
@@ -28,9 +28,15 @@ export const NavItemRenderer: React.FC<NavItemRendererProps> = ({ item, classNam
 		);
 	}
 
+	const handleLinkClick: MouseEventHandler<HTMLAnchorElement> | undefined = onClick
+		? (event) => {
+			onClick(event as unknown as ReactMouseEvent<HTMLDivElement>);
+		}
+		: undefined;
+
 	// Default: internal link
 	return (
-		<RouterLink href={path} className={className} onClick={onClick as MouseEventHandler<HTMLAnchorElement>}>
+		<RouterLink href={path} className={className} onClick={handleLinkClick}>
 			{children}
 		</RouterLink>
 	);
