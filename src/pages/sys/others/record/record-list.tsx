@@ -38,6 +38,9 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 								<Popconfirm
 									key="delete"
 									title={t("sys.record.deleteRecordConfirm")}
+									placement="topLeft"
+									autoAdjustOverflow
+									onCancel={(event) => event?.stopPropagation()}
 									onConfirm={(event) => {
 										event?.stopPropagation();
 										onDelete(record.id);
@@ -47,7 +50,7 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 									type="button"
 									variant="ghost"
 									size="icon"
-									className="size-5 text-destructive hover:text-destructive"
+									className="size-8 text-destructive hover:text-destructive"
 									onClick={(event) => event.stopPropagation()}
 									aria-label={t("sys.record.deleteRecord")}
 								>
@@ -151,14 +154,14 @@ const ListContainer = styled.div<{ $pageSize?: number }>`
 		white-space: nowrap;
 	}
 	.record-list.ant-list .ant-list-item-action {
-		width: 20px;
-		flex: 0 0 20px;
-		min-width: 20px;
+		width: 32px;
+		flex: 0 0 32px;
+		min-width: 32px;
 		margin-inline-start: 2px;
 		padding: 0;
 	}
 	.record-list.ant-list .ant-list-item-action > li {
-		width: 20px;
+		width: 32px;
 		margin-inline: 0 !important;
 		padding-inline: 0 !important;
 	}
