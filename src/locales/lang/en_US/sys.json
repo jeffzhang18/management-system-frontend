@@ -373,7 +373,8 @@
 				"importFormatTitle": "JSON format example",
 				"importFormatNote": "recordDate and title are required. themeId, startTime, endTime, and contentMd are optional. A top-level records array or a direct array is supported.",
 				"importHint": "Supports JSON files exported from this page",
-				"uploadJson": "Upload JSON"
+				"uploadJson": "Upload JSON",
+				"uploadFile": "Upload file"
 			},
 			"export": {
 				"title": "Export Work Records",
@@ -435,3 +436,6 @@
 		}
 	}
 }
+
+
+

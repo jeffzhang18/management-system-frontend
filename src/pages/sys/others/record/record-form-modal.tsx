@@ -156,16 +156,61 @@ export function RecordFormModal({
 			centered
 			onCancel={close}
 			footer={
-				<Flex justify="flex-end" gap={8}>
-					<Button type="button" variant="outline" onClick={close}>
-						{t("sys.record.form.cancel")}
-					</Button>
-					<Button type="button" onClick={() => form.submit()}>
-						{creationMode === "quick" ? t("sys.record.form.quickSave") : t("sys.record.form.save")}
-					</Button>
+				<Flex justify="space-between" align="center" gap={8} style={{ width: "100%" }}>
+					{creationMode === "detail" ? (
+						<Flex align="center" gap={4}>
+							<Upload accept="application/json,.json" showUploadList={false} beforeUpload={onImport}>
+								<Button type="button" variant="outline">
+									<Icon icon="solar:import-bold-duotone" size={18} />
+									{t("sys.record.form.uploadFile")}
+								</Button>
+							</Upload>
+							<Tooltip
+								placement="top"
+								overlayStyle={{ maxWidth: 440 }}
+								title={
+									<ImportFormatHint>
+										<strong>{t("sys.record.form.importFormatTitle")}</strong>
+										<pre>{`{
+  "records": [
+    {
+      "recordDate": "2026-08-21",
+      "title": "完成项目周报",
+      "themeId": 1,
+      "startTime": "09:00",
+      "endTime": "10:00",
+      "contentMd": "支持 Markdown"
+    }
+  ]
+}`}</pre>
+										<span>{t("sys.record.form.importFormatNote")}</span>
+									</ImportFormatHint>
+								}
+							>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon"
+									className="size-6 text-muted-foreground"
+									aria-label={t("sys.record.form.importFormatTitle")}
+								>
+									<Icon icon="solar:info-circle-linear" size={17} />
+								</Button>
+							</Tooltip>
+						</Flex>
+					) : (
+						<span />
+					)}
+					<Flex justify="flex-end" gap={8}>
+						<Button type="button" variant="outline" onClick={close}>
+							{t("sys.record.form.cancel")}
+						</Button>
+						<Button type="button" onClick={() => form.submit()}>
+							{creationMode === "quick" ? t("sys.record.form.quickSave") : t("sys.record.form.save")}
+						</Button>
+					</Flex>
 				</Flex>
-			}
-			width={creationMode === "quick" ? 520 : 600}
+			}			width={creationMode === "quick" ? 520 : 600}
 			destroyOnClose
 		>
 			<CreationSwitch
@@ -207,7 +252,7 @@ export function RecordFormModal({
 					label={t("sys.record.form.recordTitle")}
 					rules={[{ required: true, whitespace: true, message: t("sys.record.form.recordTitleRequired") }]}
 				>
-					<Input autoFocus maxLength={80} showCount placeholder={t("sys.record.form.recordTitlePlaceholder")} />
+					<Input autoFocus maxLength={200} showCount placeholder={t("sys.record.form.recordTitlePlaceholder")} />
 				</Form.Item>
 				{creationMode === "quick" && hasThemeOptions && (
 					<Form.Item name="theme" label={t("sys.record.form.theme")}>
@@ -328,7 +373,7 @@ export function RecordFormModal({
 							<Form.Item name="description" noStyle>
 								<Input.TextArea
 									style={{ display: contentMode === "edit" ? "block" : "none" }}
-									rows={2}
+									rows={5}
 									maxLength={5000}
 									showCount
 									placeholder={t("sys.record.form.markdownPlaceholder")}
@@ -344,54 +389,7 @@ export function RecordFormModal({
 								</Preview>
 							)}
 						</Form.Item>
-						<UploadArea>
-							<div>
-								<ImportTitleRow>
-									<Typography.Text strong>{t("sys.record.form.importTitle")}</Typography.Text>
-									<Tooltip
-										placement="top"
-										overlayStyle={{ maxWidth: 440 }}
-										title={
-											<ImportFormatHint>
-												<strong>{t("sys.record.form.importFormatTitle")}</strong>
-												<pre>{`{
-  "records": [
-    {
-      "recordDate": "2026-08-21",
-      "title": "完成项目周报",
-      "themeId": 1,
-      "startTime": "09:00",
-      "endTime": "10:00",
-      "contentMd": "支持 Markdown"
-    }
-  ]
-}`}</pre>
-												<span>{t("sys.record.form.importFormatNote")}</span>
-											</ImportFormatHint>
-										}
-									>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="size-6 text-muted-foreground"
-											aria-label={t("sys.record.form.importFormatTitle")}
-										>
-											<Icon icon="solar:info-circle-linear" size={17} />
-										</Button>
-									</Tooltip>
-								</ImportTitleRow>
-								<br />
-								<Typography.Text type="secondary">{t("sys.record.form.importHint")}</Typography.Text>
-							</div>
-							<Upload accept="application/json,.json" showUploadList={false} beforeUpload={onImport}>
-								<Button type="button" variant="outline">
-									<Icon icon="solar:import-bold-duotone" size={18} />
-									{t("sys.record.form.uploadJson")}
-								</Button>
-							</Upload>
-						</UploadArea>
-					</>
+						</>
 				)}
 			</Form>
 		</RecordModal>
@@ -403,7 +401,6 @@ const RecordModal = styled(Modal)`
 		width: 100%;
 	}
 `;
-const ImportTitleRow = styled.div`display: inline-flex; align-items: center; gap: 3px;`;
 const ImportFormatHint = styled.div`display: flex; width: 390px; max-width: calc(100vw - 64px); flex-direction: column; gap: 8px; font-size: 12px; line-height: 1.5; pre { max-height: 280px; margin: 0; padding: 10px; overflow: auto; border-radius: 6px; color: rgb(255 255 255 / 92%); font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; background: rgb(0 0 0 / 24%); white-space: pre; } span { color: rgb(255 255 255 / 75%); }`;
 
 const DetailModeToggle = styled.div`
@@ -471,4 +468,8 @@ const ThemeDot = styled.span<{
 }>`width: 9px; height: 9px; flex: none; border-radius: 50%; background: ${({ $color }) => $color};`;
 const ThemeSelectLabel = styled.span`display: inline-flex; align-items: center; gap: 8px;`;
 const Preview = styled.div`min-height: 210px; padding: 12px; border: 1px solid #d9d9d9; border-radius: 8px;`;
-const UploadArea = styled.div`display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px dashed #d9d9d9; border-radius: 10px;`;
+
+
+
+
+

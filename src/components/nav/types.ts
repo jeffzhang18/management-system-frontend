@@ -30,6 +30,7 @@ export type NavItemProps = React.ComponentProps<"div"> & NavItemDataProps & NavI
  */
 export type NavListProps = Pick<NavItemProps, "depth"> & {
 	data: NavItemDataProps;
+	onItemClick?: () => void;
 	authenticate?: (auth?: NavItemProps["auth"]) => boolean;
 };
 

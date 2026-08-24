@@ -373,7 +373,8 @@
 				"importFormatTitle": "JSON 格式示例",
 				"importFormatNote": "recordDate 和 title 为必填字段；themeId、startTime、endTime、contentMd 为可选字段。也支持直接上传记录数组。",
 				"importHint": "支持由本页面导出的 JSON 文件",
-				"uploadJson": "上传 JSON"
+				"uploadJson": "上传 JSON",
+				"uploadFile": "上传文件"
 			},
 			"export": {
 				"title": "导出工作记录",
@@ -435,3 +436,6 @@
 		}
 	}
 }
+
+
+

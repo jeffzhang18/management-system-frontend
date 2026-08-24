@@ -6,7 +6,7 @@ import { useToggle } from "react-use";
 import type { NavGroupProps } from "../types";
 import { NavList } from "./nav-list";
 
-export function NavGroup({ name, items }: NavGroupProps) {
+export function NavGroup({ name, items, onItemClick }: NavGroupProps) {
 	const [open, toggleOpen] = useToggle(true);
 
 	return (
@@ -17,7 +17,7 @@ export function NavGroup({ name, items }: NavGroupProps) {
 			<CollapsibleContent>
 				<ul className="flex w-full flex-col gap-1">
 					{items.map((item, index) => (
-						<NavList key={item.title || index} data={item} depth={1} />
+						<NavList key={item.title || index} data={item} depth={1} onItemClick={onItemClick} />
 					))}
 				</ul>
 			</CollapsibleContent>
@@ -48,3 +48,4 @@ function Group({ name, open, onClick }: { name?: string; open: boolean; onClick:
 		)
 	);
 }
+
