@@ -87,10 +87,11 @@ const UserBrowsingTracker = () => {
 			return;
 		}
 
-		void userBrowsingHistoryService.create({ pageUrl: pathname, device }, accessToken);
+		void userBrowsingHistoryService.create({ pageUrl: pathname, device });
 	}, [accessToken, pathname, device]);
 
 	return null;
 };
 
 export default UserBrowsingTracker;
+

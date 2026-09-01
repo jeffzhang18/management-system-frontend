@@ -4,12 +4,16 @@ import type { Locale as AntdLocal } from "antd/es/locale";
 import en_US from "antd/locale/en_US";
 import zh_CN from "antd/locale/zh_CN";
 import dayjs from "dayjs";
+import updateLocale from "dayjs/plugin/updateLocale";
 import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { UserInfo } from "#/entity";
 import { LocalEnum, StorageEnum } from "#/enum";
 import userService from "@/api/services/userService";
 import { useUserActions, useUserInfo, useUserToken } from "@/store/userStore";
+
+dayjs.extend(updateLocale);
+dayjs.updateLocale("zh-cn", { weekStart: 0 });
 
 type Locale = keyof typeof LocalEnum;
 type Language = {

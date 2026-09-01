@@ -787,11 +787,21 @@ const CalendarCard = styled(Card)`
 		position: relative;
 		contain: layout paint;
 	}
-	.ant-picker-calendar-date { height: auto !important; margin: 3px !important; padding: 0 !important; border: 0 !important; }
+	.ant-picker-content thead th { text-align: center !important; }
+	.ant-picker-calendar-date {
+		height: auto !important;
+		width: calc(100% - 6px);
+		margin: 3px auto !important;
+		padding: 0 !important;
+		border: 0 !important;
+	}
 	.ant-picker-calendar-date-content { height: auto !important; overflow: hidden !important; }
 	.ant-picker-cell::before { display: none !important; }
 	@media (max-width: 767px) {
-		.ant-picker-calendar-date { margin: 2px !important; }
+		.ant-picker-calendar-date {
+			width: calc(100% - 4px);
+			margin: 2px auto !important;
+		}
 	}
 `;
 const CalendarLoadingMask = styled.div<{ $show: boolean }>`
@@ -968,3 +978,4 @@ const CellRecords = styled.div`
 		span { font-size: 11px; }
 	}
 `;
+

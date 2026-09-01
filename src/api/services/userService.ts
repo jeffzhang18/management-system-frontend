@@ -30,7 +30,7 @@ export enum UserApi {
 	SignUp = "/auth/register",
 	// 以下接口还未实现
 	Logout = "/auth/logout",
-	Refresh = "/auth/refresh",
+	Refresh = "/auth/refresh-token",
 	User = "/user",
 	Profile = "/user/profile",
 }

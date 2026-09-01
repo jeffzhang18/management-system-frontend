@@ -1,4 +1,4 @@
-import { GLOBAL_CONFIG } from "@/global-config";
+import apiClient from "@/api/apiClient";
 
 export interface UserBrowsingHistoryPayload {
 	pageUrl: string;
@@ -9,23 +9,11 @@ enum UserBrowsingHistoryApi {
 	Create = "/sys/user-browsing-history",
 }
 
-const joinApiUrl = (path: string) => {
-	const baseUrl = GLOBAL_CONFIG.apiBaseUrl.replace(/\/+$/g, "");
-	const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-	return `${baseUrl}${normalizedPath}`;
-};
-
-const create = async (payload: UserBrowsingHistoryPayload, accessToken: string) => {
-	await fetch(joinApiUrl(UserBrowsingHistoryApi.Create), {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			Authorization: `Bearer ${accessToken}`,
-		},
-		body: JSON.stringify(payload),
-		keepalive: true,
+const create = (payload: UserBrowsingHistoryPayload) =>
+	apiClient.post<void>({
+		url: UserBrowsingHistoryApi.Create,
+		data: payload,
 	});
-};
 
 export default {
 	create,
