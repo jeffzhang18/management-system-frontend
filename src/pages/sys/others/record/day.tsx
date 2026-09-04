@@ -113,7 +113,7 @@ export default function RecordDayPage() {
 				<Button
 					variant="ghost"
 					size="icon"
-					onClick={() => navigate("/record")}
+					onClick={() => navigate("/record", { state: { focusDate: selectedDateKey } })}
 					aria-label={t("sys.record.backCalendar")}
 				>
 					<Icon icon="solar:arrow-left-linear" size={22} />
@@ -137,7 +137,7 @@ export default function RecordDayPage() {
 				<RecordList
 					records={records}
 					themes={themes}
-					onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "day" } })}
+					onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "day", focusDate: selectedDateKey } })}
 					onDelete={(id) => void handleDelete(id)}
 				/>
 			</Card>

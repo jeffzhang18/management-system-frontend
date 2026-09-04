@@ -1,4 +1,5 @@
 import { Card, Empty, Flex, Space, Tag, Typography } from "antd";
+import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router";
@@ -9,14 +10,35 @@ import { mapWorkRecordDetail } from "./api-adapter";
 import { Markdown } from "./markdown";
 import type { WorkRecord } from "./types";
 
+type RecordDetailLocationState = {
+	from?: "calendar" | "day";
+	focusDate?: string;
+};
+
+const resolveFocusDateFromState = (state: unknown): string | null => {
+	if (!state || typeof state !== "object") return null;
+	const focusDate = (state as { focusDate?: unknown }).focusDate;
+	return typeof focusDate === "string" ? focusDate : null;
+};
+
 export default function RecordDetailPage() {
 	const { t } = useTranslation();
 	const { id } = useParams();
 	const navigate = useNavigate();
 	const location = useLocation();
+	const locationState = location.state as RecordDetailLocationState | null;
+	const focusDate = resolveFocusDateFromState(location.state);
 
 	const [record, setRecord] = useState<WorkRecord | null>(null);
 	const [loading, setLoading] = useState(true);
+
+	const goBack = () => {
+		if (record && locationState?.from === "day") {
+			navigate(`/record/day/${record.date}`, { state: { focusDate: record.date } });
+			return;
+		}
+		navigate("/record", { state: { focusDate: focusDate ?? record?.date ?? dayjs().format("YYYY-MM-DD") } });
+	};
 
 	useEffect(() => {
 		if (!id) {
@@ -52,12 +74,10 @@ export default function RecordDetailPage() {
 		return (
 			<Card>
 				<Empty description={t("sys.record.recordMissing")}>
-					<Button onClick={() => navigate("/record")}>{t("sys.record.backCalendar")}</Button>
+					<Button onClick={goBack}>{t("sys.record.backCalendar")}</Button>
 				</Empty>
 			</Card>
 		);
-
-	const backTarget = record && location.state?.from === "day" ? `/record/day/${record.date}` : "/record";
 
 	return (
 		<div>
@@ -65,8 +85,8 @@ export default function RecordDetailPage() {
 				<Button
 					variant="ghost"
 					size="icon"
-					onClick={() => navigate(backTarget)}
-					aria-label={location.state?.from === "day" ? t("sys.record.backDay") : t("sys.record.backCalendar")}
+					onClick={goBack}
+					aria-label={locationState?.from === "day" ? t("sys.record.backDay") : t("sys.record.backCalendar")}
 				>
 					<Icon icon="solar:arrow-left-linear" size={22} />
 				</Button>
@@ -98,4 +118,3 @@ export default function RecordDetailPage() {
 		</div>
 	);
 }
-

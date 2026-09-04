@@ -3,7 +3,7 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import styled from "styled-components";
 import type { CreateWorkRecordReq, WorkRecordContributionItem } from "@/api/services/workRecordService";
@@ -30,6 +30,14 @@ import { compareWorkRecords, getRecordTheme, getRecordThemeLabel, type RecordThe
 
 const dateKey = (date: Dayjs) => date.format("YYYY-MM-DD");
 
+const resolveFocusDateFromLocationState = (state: unknown): Dayjs | null => {
+	if (!state || typeof state !== "object") return null;
+	const focusDate = (state as { focusDate?: unknown }).focusDate;
+	if (typeof focusDate !== "string") return null;
+	const parsed = dayjs(focusDate, "YYYY-MM-DD", true);
+	return parsed.isValid() ? parsed : null;
+};
+
 const getCurrentWorkweekRange = (): [Dayjs, Dayjs] => {
 	const today = dayjs();
 	const monday = today.subtract((today.day() + 6) % 7, "day").startOf("day");
@@ -39,12 +47,13 @@ const getCurrentWorkweekRange = (): [Dayjs, Dayjs] => {
 export default function RecordPage() {
 	const { t, i18n } = useTranslation();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const isMobile = useMediaQuery({ maxWidth: 767 });
 	const calendarRequestIdRef = useRef(0);
 	const calendarCardRef = useRef<HTMLDivElement>(null);
 	const createOpenRef = useRef(false);
 	const hoverLoadingDatesRef = useRef(new Set<string>());
-	const [selectedDate, setSelectedDate] = useState(dayjs());
+	const [selectedDate, setSelectedDate] = useState(() => resolveFocusDateFromLocationState(location.state) ?? dayjs());
 	const [calendarRecords, setCalendarRecords] = useState<CalendarCellRecord[]>([]);
 	const [dayRecords, setDayRecords] = useState<WorkRecord[]>([]);
 	const [hoverRecordsByDate, setHoverRecordsByDate] = useState<Record<string, WorkRecord[]>>({});
@@ -175,6 +184,12 @@ export default function RecordPage() {
 	}, [loadContributions]);
 
 	useEffect(() => {
+		const focusDate = resolveFocusDateFromLocationState(location.state);
+		if (!focusDate) return;
+		setSelectedDate((previous) => (previous.isSame(focusDate, "day") ? previous : focusDate));
+	}, [location.state]);
+
+	useEffect(() => {
 		if (!openPopoverDate) return;
 
 		const closePopoverOnOutsidePointerDown = (event: PointerEvent) => {
@@ -261,7 +276,7 @@ export default function RecordPage() {
 
 	const goDayDetail = (date: string) => {
 		updateOpenPopoverDate(null);
-		navigate(`/record/day/${date}`);
+		navigate(`/record/day/${date}`, { state: { focusDate: date } });
 	};
 
 	const handleCreate = async (value: CreateRecordFormPayload) => {
@@ -493,7 +508,6 @@ export default function RecordPage() {
 								<Space size={2}>
 									<Button
 										variant="outline"
-										className="bg-white hover:bg-gray-50"
 										onClick={() => {
 											const today = dayjs();
 											onChange(today);
@@ -583,7 +597,11 @@ export default function RecordPage() {
 									$today={key === todayKey}
 									$outside={!date.isSame(selectedDate, "month")}
 									onClick={() => {
-										if (createOpenRef.current || isPopoverOpen) return;
+										if (createOpenRef.current) return;
+										if (isPopoverOpen) {
+											updateOpenPopoverDate(null);
+											return;
+										}
 										openDatePopover(key);
 									}}
 								>
@@ -641,7 +659,11 @@ export default function RecordPage() {
 										? selectedDate.format("M月D日 · dddd")
 										: selectedDate.format("MMMM D · dddd")}
 								</span>
-								<Button variant="link" size="sm" onClick={() => navigate(`/record/day/${dateKey(selectedDate)}`)}>
+								<Button
+									variant="link"
+									size="sm"
+									onClick={() => navigate(`/record/day/${dateKey(selectedDate)}`, { state: { focusDate: selectedDateKey } })}
+								>
 									{t("sys.record.viewAllToday")}
 								</Button>
 							</DayCardTitle>
@@ -660,7 +682,7 @@ export default function RecordPage() {
 							themes={themes}
 							enablePagination
 							pageSize={5}
-							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar" } })}
+							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar", focusDate: record.date } })}
 								onDelete={(id) => {
 									void handleDelete(id);
 								}}
