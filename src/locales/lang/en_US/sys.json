@@ -334,7 +334,12 @@
 				"wednesday": "Wed",
 				"friday": "Fri",
 				"less": "Less",
-				"more": "More"
+				"more": "More",
+				"legendLevel0": "0 records",
+				"legendLevel1": "1-2 records",
+				"legendLevel2": "3-4 records",
+				"legendLevel3": "5-6 records",
+				"legendLevel4": ">=7 records"
 			},
 			"form": {
 				"title": "New Record · {{date}}",
@@ -436,6 +441,8 @@
 		}
 	}
 }
+
+
 
 
 

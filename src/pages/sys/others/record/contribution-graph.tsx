@@ -26,7 +26,13 @@ interface ContributionDay {
 
 const CELL_SIZE = 11;
 const CELL_GAP = 3;
-const clampLevel = (level: number) => Math.min(4, Math.max(0, Math.round(level)));
+const levelFromCount = (count: number) => {
+	if (count >= 7) return 4;
+	if (count >= 5) return 3;
+	if (count >= 3) return 2;
+	if (count >= 1) return 1;
+	return 0;
+};
 const intensityColor = (level: number) => {
 	if (level === 0) return `color-mix(in srgb, ${themeVars.colors.text.primary} 8%, ${themeVars.colors.background.paper})`;
 	const strength = [0, 24, 45, 68, 100][level];
@@ -68,7 +74,7 @@ function ContributionGraphComponent({ items, loading, year, years, onYearChange,
 				week.push({
 					key,
 					count: Number(item?.records ?? 0),
-					level: clampLevel(Number(item?.level ?? 0)),
+					level: levelFromCount(Number(item?.records ?? 0)),
 					inYear: cursor.year() === year,
 				});
 				if (cursor.year() === year && cursor.month() !== previousMonth && cursor.date() <= 7) {
@@ -87,7 +93,13 @@ function ContributionGraphComponent({ items, loading, year, years, onYearChange,
 			total: items.reduce((sum, item) => sum + Number(item.records ?? 0), 0),
 		};
 	}, [i18n.resolvedLanguage, items, year]);
-
+		const getLegendTooltip = (level: number) => {
+		if (level === 4) return t("sys.record.contributions.legendLevel4");
+		if (level === 3) return t("sys.record.contributions.legendLevel3");
+		if (level === 2) return t("sys.record.contributions.legendLevel2");
+		if (level === 1) return t("sys.record.contributions.legendLevel1");
+		return t("sys.record.contributions.legendLevel0");
+	};
 	return (
 		<ContributionCard>
 			<Header>
@@ -150,7 +162,22 @@ function ContributionGraphComponent({ items, loading, year, years, onYearChange,
 						</Chart>
 						<Legend $weekCount={weekCount}>
 							<span>{t("sys.record.contributions.less")}</span>
-							{[0, 1, 2, 3, 4].map((level) => <Cell key={level} $level={level} $hidden={false} aria-hidden="true" />)}
+							{[0, 1, 2, 3, 4].map((level) => {
+								const legendTooltip = getLegendTooltip(level);
+								return (
+									<LegendCell
+										key={level}
+										$level={level}
+										$hidden={false}
+										$interactive
+										aria-label={legendTooltip}
+										onMouseEnter={(event) => showTooltip(event.currentTarget, legendTooltip)}
+										onFocus={(event) => showTooltip(event.currentTarget, legendTooltip)}
+										onMouseLeave={hideTooltip}
+										onBlur={hideTooltip}
+									/>
+								);
+							})}
 							<span>{t("sys.record.contributions.more")}</span>
 						</Legend>
 					</ScrollArea>
@@ -204,6 +231,7 @@ const Cell = styled.span<{ $level: number; $hidden: boolean; $interactive?: bool
 	cursor: ${({ $interactive }) => ($interactive ? "pointer" : "default")};
 	&:focus-visible { outline: 2px solid ${themeVars.colors.palette.primary.default}; outline-offset: 2px; }
 `;
+const LegendCell = styled(Cell).attrs({ role: "img", tabIndex: 0 })``;
 const ContributionTooltip = styled.div`
 	position: fixed;
 	z-index: 1100;

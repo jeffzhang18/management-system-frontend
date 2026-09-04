@@ -334,7 +334,12 @@
 				"wednesday": "三",
 				"friday": "五",
 				"less": "少",
-				"more": "多"
+				"more": "多",
+				"legendLevel0": "0 条记录",
+				"legendLevel1": "1-2 条记录",
+				"legendLevel2": "3-4 条记录",
+				"legendLevel3": "5-6 条记录",
+				"legendLevel4": ">=7 条记录"
 			},
 			"form": {
 				"title": "新建记录 · {{date}}",
@@ -436,6 +441,8 @@
 		}
 	}
 }
+
+
 
 
 
