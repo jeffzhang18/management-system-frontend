@@ -29,13 +29,39 @@ import { RecordList } from "./record-list";
 import { compareWorkRecords, getRecordTheme, getRecordThemeLabel, type RecordThemeOption, type WorkRecord } from "./types";
 
 const dateKey = (date: Dayjs) => date.format("YYYY-MM-DD");
+const SELECTED_DATE_STORAGE_KEY = "work-record.selectedDate";
 
-const resolveFocusDateFromLocationState = (state: unknown): Dayjs | null => {
-	if (!state || typeof state !== "object") return null;
-	const focusDate = (state as { focusDate?: unknown }).focusDate;
-	if (typeof focusDate !== "string") return null;
-	const parsed = dayjs(focusDate, "YYYY-MM-DD", true);
+const parseSelectedDate = (value: unknown): Dayjs | null => {
+	if (typeof value !== "string") return null;
+	const parsed = dayjs(value, "YYYY-MM-DD", true);
 	return parsed.isValid() ? parsed : null;
+};
+
+const resolveSelectedDateFromLocationState = (state: unknown): Dayjs | null => {
+	if (!state || typeof state !== "object") return null;
+	return parseSelectedDate((state as { selectedDate?: unknown }).selectedDate);
+};
+
+const resolveStoredSelectedDate = (): Dayjs | null => {
+	if (typeof window === "undefined") return null;
+	return parseSelectedDate(window.localStorage.getItem(SELECTED_DATE_STORAGE_KEY));
+};
+
+const replaceCurrentRouteSelectedDate = (selectedDate: string) => {
+	if (typeof window === "undefined") return;
+	const currentState = window.history.state;
+	const currentRouteState = currentState && typeof currentState === "object" ? currentState.usr : undefined;
+	window.history.replaceState(
+		{
+			...(currentState && typeof currentState === "object" ? currentState : {}),
+			usr: {
+				...(currentRouteState && typeof currentRouteState === "object" ? currentRouteState : {}),
+				selectedDate,
+			},
+		},
+		"",
+		window.location.href,
+	);
 };
 
 const getCurrentWorkweekRange = (): [Dayjs, Dayjs] => {
@@ -53,7 +79,7 @@ export default function RecordPage() {
 	const calendarCardRef = useRef<HTMLDivElement>(null);
 	const createOpenRef = useRef(false);
 	const hoverLoadingDatesRef = useRef(new Set<string>());
-	const [selectedDate, setSelectedDate] = useState(() => resolveFocusDateFromLocationState(location.state) ?? dayjs());
+	const [selectedDate, setSelectedDate] = useState(() => resolveSelectedDateFromLocationState(location.state) ?? resolveStoredSelectedDate() ?? dayjs());
 	const [calendarRecords, setCalendarRecords] = useState<CalendarCellRecord[]>([]);
 	const [dayRecords, setDayRecords] = useState<WorkRecord[]>([]);
 	const [hoverRecordsByDate, setHoverRecordsByDate] = useState<Record<string, WorkRecord[]>>({});
@@ -184,9 +210,12 @@ export default function RecordPage() {
 	}, [loadContributions]);
 
 	useEffect(() => {
-		const focusDate = resolveFocusDateFromLocationState(location.state);
-		if (!focusDate) return;
-		setSelectedDate((previous) => (previous.isSame(focusDate, "day") ? previous : focusDate));
+		const routeSelectedDate = resolveSelectedDateFromLocationState(location.state);
+		if (!routeSelectedDate) return;
+
+		const key = dateKey(routeSelectedDate);
+		setSelectedDate((previous) => (previous.isSame(routeSelectedDate, "day") ? previous : routeSelectedDate));
+		window.localStorage.setItem(SELECTED_DATE_STORAGE_KEY, key);
 	}, [location.state]);
 
 	useEffect(() => {
@@ -247,7 +276,10 @@ export default function RecordPage() {
 	}, [exportRange, loadCalendarSummary, loadContributions, loadDayRecords, loadExportCount, loadThemeList, monthEnd, monthStart, selectedDateKey]);
 
 	const selectDate = useCallback((date: Dayjs) => {
+		const key = dateKey(date);
 		setSelectedDate((previous) => (previous.isSame(date, "day") ? previous : date));
+		window.localStorage.setItem(SELECTED_DATE_STORAGE_KEY, key);
+		replaceCurrentRouteSelectedDate(key);
 	}, []);
 
 	const updateOpenPopoverDate = (date: string | null) => {
@@ -256,19 +288,19 @@ export default function RecordPage() {
 
 	const openDatePopover = useCallback((key: string) => {
 		if (createOpenRef.current) return;
-		setSelectedDate(dayjs(key));
+		selectDate(dayjs(key));
 		setOpenPopoverDate(key);
 		requestAnimationFrame(() => {
 			void loadHoverRecords(key);
 		});
-	}, [loadHoverRecords]);
+	}, [loadHoverRecords, selectDate]);
 
 	const closePopoverImmediately = () => {
 		updateOpenPopoverDate(null);
 	};
 
 	const openCreateModalForDate = (date: Dayjs) => {
-		setSelectedDate(date);
+		selectDate(date);
 		createOpenRef.current = true;
 		closePopoverImmediately();
 		setCreateOpen(true);
@@ -276,7 +308,7 @@ export default function RecordPage() {
 
 	const goDayDetail = (date: string) => {
 		updateOpenPopoverDate(null);
-		navigate(`/record/day/${date}`, { state: { focusDate: date } });
+		navigate(`/record/day/${date}`, { state: { selectedDate: selectedDateKey } });
 	};
 
 	const handleCreate = async (value: CreateRecordFormPayload) => {
@@ -451,12 +483,12 @@ export default function RecordPage() {
 					</Typography.Title>
 					<Typography.Text type="secondary">{t("sys.record.subtitle")}</Typography.Text>
 				</div>
-				<Space wrap>
-					<Button onClick={() => setExportOpen(true)}>
+				<PageActions wrap>
+					<Button variant="outline" onClick={() => setExportOpen(true)}>
 						<Icon icon="solar:download-bold-duotone" size={18} />
 						{t("sys.record.exportRecords")}
 					</Button>
-				</Space>
+				</PageActions>
 			</Flex>
 
 			<Workspace>
@@ -662,16 +694,14 @@ export default function RecordPage() {
 								<Button
 									variant="link"
 									size="sm"
-									onClick={() => navigate(`/record/day/${dateKey(selectedDate)}`, { state: { focusDate: selectedDateKey } })}
+									onClick={() => navigate(`/record/day/${dateKey(selectedDate)}`, { state: { selectedDate: selectedDateKey } })}
 								>
 									{t("sys.record.viewAllToday")}
 								</Button>
 							</DayCardTitle>
 						}
-							extra={
-							<Button
-								onClick={() => openCreateModalForDate(selectedDate)}
-							>
+						extra={
+							<Button onClick={() => openCreateModalForDate(selectedDate)}>
 								<Icon icon="solar:add-circle-bold" size={18} />
 								{t("sys.record.new")}
 							</Button>
@@ -682,7 +712,7 @@ export default function RecordPage() {
 							themes={themes}
 							enablePagination
 							pageSize={5}
-							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar", focusDate: record.date } })}
+							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar", selectedDate: selectedDateKey } })}
 								onDelete={(id) => {
 									void handleDelete(id);
 								}}
@@ -750,6 +780,11 @@ const Page = styled.div`
 	gap: 16px;
 `;
 const Workspace = styled.div`display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: stretch; gap: 24px; @media (max-width: 1100px) { grid-template-columns: minmax(0, 1fr); }`;
+const PageActions = styled(Space)`
+	@media (min-width: 1101px) {
+		padding-right: 24px;
+	}
+`;
 const CalendarHeader = styled.div`
 	display: grid;
 	grid-template-columns: 1fr auto 1fr;
@@ -853,11 +888,10 @@ const DateCell = styled.div<{ $selected: boolean; $today: boolean; $outside: boo
 	background: ${({ $selected }) =>
 		$selected ? `color-mix(in srgb, ${themeVars.colors.palette.primary.default} 16%, transparent)` : "transparent"};
 	opacity: ${({ $outside }) => ($outside ? 0.4 : 1)};
-	transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+	transition: background 120ms ease, border-color 120ms ease;
 	&:hover {
 		border-color: color-mix(in srgb, ${themeVars.colors.palette.primary.default} 24%, transparent);
 		background: color-mix(in srgb, ${themeVars.colors.palette.primary.default} 9%, transparent);
-		box-shadow: 0 4px 14px rgb(0 0 0 / 5%);
 	}
 	&:hover button { opacity: 1; }
 	${({ $today, $selected }) =>

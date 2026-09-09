@@ -1,5 +1,4 @@
 import { Card, Empty, Flex, Space, Tag, Typography } from "antd";
-import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useParams } from "react-router";
@@ -12,13 +11,7 @@ import type { WorkRecord } from "./types";
 
 type RecordDetailLocationState = {
 	from?: "calendar" | "day";
-	focusDate?: string;
-};
-
-const resolveFocusDateFromState = (state: unknown): string | null => {
-	if (!state || typeof state !== "object") return null;
-	const focusDate = (state as { focusDate?: unknown }).focusDate;
-	return typeof focusDate === "string" ? focusDate : null;
+	selectedDate?: string;
 };
 
 export default function RecordDetailPage() {
@@ -27,17 +20,17 @@ export default function RecordDetailPage() {
 	const navigate = useNavigate();
 	const location = useLocation();
 	const locationState = location.state as RecordDetailLocationState | null;
-	const focusDate = resolveFocusDateFromState(location.state);
 
 	const [record, setRecord] = useState<WorkRecord | null>(null);
 	const [loading, setLoading] = useState(true);
 
 	const goBack = () => {
+		const selectedDate = locationState?.selectedDate ?? record?.date;
 		if (record && locationState?.from === "day") {
-			navigate(`/record/day/${record.date}`, { state: { focusDate: record.date } });
+			navigate(`/record/day/${record.date}`, { state: { selectedDate } });
 			return;
 		}
-		navigate("/record", { state: { focusDate: focusDate ?? record?.date ?? dayjs().format("YYYY-MM-DD") } });
+		navigate("/record", { state: selectedDate ? { selectedDate } : undefined });
 	};
 
 	useEffect(() => {

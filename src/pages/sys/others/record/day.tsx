@@ -2,7 +2,7 @@ import { Card, Flex, message, Typography } from "antd";
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import type { CreateWorkRecordReq } from "@/api/services/workRecordService";
 import workRecordService from "@/api/services/workRecordService";
@@ -18,12 +18,19 @@ import { type CreateRecordFormPayload, RecordFormModal } from "./record-form-mod
 import { RecordList } from "./record-list";
 import { compareWorkRecords, type RecordThemeOption, type WorkRecord } from "./types";
 
+type RecordDayLocationState = {
+	selectedDate?: string;
+};
+
 export default function RecordDayPage() {
 	const { t, i18n } = useTranslation();
 	const { date = "" } = useParams();
 	const navigate = useNavigate();
+	const location = useLocation();
+	const locationState = location.state as RecordDayLocationState | null;
 	const selectedDate = useMemo(() => (dayjs(date, "YYYY-MM-DD", true).isValid() ? dayjs(date) : dayjs()), [date]);
 	const selectedDateKey = selectedDate.format("YYYY-MM-DD");
+	const calendarSelectedDate = locationState?.selectedDate ?? selectedDateKey;
 	const [records, setRecords] = useState<WorkRecord[]>([]);
 	const [themes, setThemes] = useState<RecordThemeOption[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -113,7 +120,7 @@ export default function RecordDayPage() {
 				<Button
 					variant="ghost"
 					size="icon"
-					onClick={() => navigate("/record", { state: { focusDate: selectedDateKey } })}
+					onClick={() => navigate("/record", { state: { selectedDate: calendarSelectedDate } })}
 					aria-label={t("sys.record.backCalendar")}
 				>
 					<Icon icon="solar:arrow-left-linear" size={22} />
@@ -137,7 +144,7 @@ export default function RecordDayPage() {
 				<RecordList
 					records={records}
 					themes={themes}
-					onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "day", focusDate: selectedDateKey } })}
+					onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "day", selectedDate: calendarSelectedDate } })}
 					onDelete={(id) => void handleDelete(id)}
 				/>
 			</Card>
