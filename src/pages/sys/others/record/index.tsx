@@ -890,12 +890,20 @@ const DateCell = styled.div<{ $selected: boolean; $today: boolean; $outside: boo
 	opacity: ${({ $outside }) => ($outside ? 0.4 : 1)};
 	transition: background 120ms ease, border-color 120ms ease;
 	&:hover {
-		border-color: color-mix(in srgb, ${themeVars.colors.palette.primary.default} 24%, transparent);
-		background: color-mix(in srgb, ${themeVars.colors.palette.primary.default} 9%, transparent);
+		border-color: ${({ $selected }) =>
+			$selected
+				? themeVars.colors.palette.primary.default
+				: `color-mix(in srgb, ${themeVars.colors.palette.primary.default} 24%, transparent)`};
+		background: ${({ $selected }) =>
+			$selected
+				? `color-mix(in srgb, ${themeVars.colors.palette.primary.default} 16%, transparent)`
+				: `color-mix(in srgb, ${themeVars.colors.palette.primary.default} 9%, transparent)`};
 	}
 	&:hover button { opacity: 1; }
 	${({ $today, $selected }) =>
-		$today && !$selected ? `> span:first-child { color: white; background: ${themeVars.colors.palette.primary.default}; }` : ""}
+		$today
+			? `> span:first-child { color: white; background: ${themeVars.colors.palette.primary.default}; ${$selected ? "box-shadow: 0 0 0 1px color-mix(in srgb, white 35%, transparent);" : ""} }`
+			: ""}
 	@media (max-width: 767px) { padding: 5px; border-radius: 8px; }
 `;
 const DateNumber = styled.span`
@@ -1034,4 +1042,6 @@ const CellRecords = styled.div`
 		span { font-size: 11px; }
 	}
 `;
+
+
 

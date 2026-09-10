@@ -1,3 +1,4 @@
+import dayjs from "dayjs";
 export type RecordTheme = string;
 
 export interface RecordThemeOption {
@@ -47,4 +48,14 @@ export const compareWorkRecords = (a: WorkRecord, b: WorkRecord) => {
 	if (a.startTime) return -1;
 	if (b.startTime) return 1;
 	return a.createdAt.localeCompare(b.createdAt);
+};
+
+export const getRecordTimeLabel = (record: WorkRecord, translate: (key: string, options?: Record<string, unknown>) => string) => {
+	if (record.startTime)
+		return record.endTime ? `${record.startTime} - ${record.endTime}` : translate("sys.record.fromTime", { time: record.startTime });
+
+	const createdAt = dayjs(record.createdAt);
+	if (createdAt.isValid()) return createdAt.format("HH:mm");
+
+	return translate("sys.record.allDay");
 };

@@ -3,7 +3,7 @@ import styled from "styled-components";
 import { useTranslation } from "react-i18next";
 import { Icon } from "@/components/icon";
 import { Button } from "@/ui/button";
-import { getRecordTheme, getRecordThemeLabel, type RecordThemeOption, type WorkRecord } from "./types";
+import { getRecordTheme, getRecordThemeLabel, getRecordTimeLabel, type RecordThemeOption, type WorkRecord } from "./types";
 
 interface Props {
 	records: WorkRecord[];
@@ -72,7 +72,7 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 								}
 								description={
 									<Typography.Text className="record-list-description">
-										{`${record.startTime ? (record.endTime ? `${record.startTime} - ${record.endTime}` : t("sys.record.fromTime", { time: record.startTime })) : t("sys.record.allDay")}${record.description ? ` · ${record.description.replace(/[#*`>_~[\]()-]/g, "").slice(0, 200)}` : ""}`}
+										{`${getRecordTimeLabel(record, t)}${record.description ? ` · ${record.description.replace(/[#*`>_~[\]()-]/g, "").slice(0, 200)}` : ""}`}
 									</Typography.Text>
 								}
 							/>
@@ -178,3 +178,5 @@ const ListContainer = styled.div<{ $pageSize?: number }>`
 		pointer-events: none;
 	}
 `;
+
+

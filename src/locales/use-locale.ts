@@ -46,16 +46,21 @@ export default function useLocale() {
 
 	const locale = (i18n.resolvedLanguage || LocalEnum.en_US) as Locale;
 	const language = LANGUAGE_MAP[locale];
+	const mapLocaleToDayjsLocale = (nextLocale: Locale) => (nextLocale === LocalEnum.zh_CN ? "zh-cn" : "en");
 
 	const applyLocale = useCallback(
 		(nextLocale: Locale) => {
 			void i18n.changeLanguage(nextLocale);
 			localStorage.setItem(StorageEnum.I18N, nextLocale);
 			document.documentElement.lang = nextLocale;
-			dayjs.locale(nextLocale);
+			dayjs.locale(mapLocaleToDayjsLocale(nextLocale));
 		},
 		[i18n],
 	);
+
+	useEffect(() => {
+		dayjs.locale(mapLocaleToDayjsLocale(locale));
+	}, [locale]);
 
 	const mapLocaleToApiLanguage = (nextLocale: Locale) => {
 		return nextLocale === LocalEnum.zh_CN ? "zh-CN" : "en-US";

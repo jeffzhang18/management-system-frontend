@@ -7,7 +7,7 @@ import { Icon } from "@/components/icon";
 import { Button } from "@/ui/button";
 import { mapWorkRecordDetail } from "./api-adapter";
 import { Markdown } from "./markdown";
-import type { WorkRecord } from "./types";
+import { getRecordTimeLabel, type WorkRecord } from "./types";
 
 type RecordDetailLocationState = {
 	from?: "calendar" | "day";
@@ -93,8 +93,7 @@ export default function RecordDetailPage() {
 						<Space wrap>
 							<Tag color={record.themeColor ?? "#64748b"}>{record.themeName ?? t("sys.record.themes.other")}</Tag>
 							<Typography.Text type="secondary">
-								{record.date} · {record.startTime ?? t("sys.record.allDay")}
-								{record.endTime ? ` - ${record.endTime}` : ""}
+								{record.date} · {getRecordTimeLabel(record, t)}
 							</Typography.Text>
 						</Space>
 						<Typography.Title level={2} style={{ margin: 0 }}>
@@ -111,3 +110,4 @@ export default function RecordDetailPage() {
 		</div>
 	);
 }
+
