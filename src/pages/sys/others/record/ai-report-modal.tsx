@@ -1,4 +1,5 @@
-import { message, Modal, Spin, Typography } from "antd";
+import { Input, message, Modal, Spin, Typography } from "antd";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import { Icon } from "@/components/icon";
@@ -16,6 +17,34 @@ interface Props {
 
 export function AiReportModal({ open, weeklyReport, nextWeekPlan, showNextWeekPlan, nextWeekPlanLoading, onClose }: Props) {
 	const { t } = useTranslation();
+	const [editableWeeklyReport, setEditableWeeklyReport] = useState(weeklyReport);
+	const [editableNextWeekPlan, setEditableNextWeekPlan] = useState(nextWeekPlan);
+	const [editingSection, setEditingSection] = useState<"weekly" | "next" | null>(null);
+	const [weeklyDirty, setWeeklyDirty] = useState(false);
+	const [nextDirty, setNextDirty] = useState(false);
+	const prevOpenRef = useRef(open);
+
+	useEffect(() => {
+		const justOpened = !prevOpenRef.current && open;
+		if (justOpened) {
+			setEditableWeeklyReport(weeklyReport);
+			setEditableNextWeekPlan(nextWeekPlan);
+			setEditingSection(null);
+			setWeeklyDirty(false);
+			setNextDirty(false);
+		}
+		prevOpenRef.current = open;
+	}, [open, weeklyReport, nextWeekPlan]);
+
+	useEffect(() => {
+		if (!open || weeklyDirty) return;
+		setEditableWeeklyReport(weeklyReport);
+	}, [open, weeklyReport, weeklyDirty]);
+
+	useEffect(() => {
+		if (!open || nextDirty) return;
+		setEditableNextWeekPlan(nextWeekPlan);
+	}, [open, nextWeekPlan, nextDirty]);
 
 	const copyReport = async (content: string) => {
 		try {
@@ -45,13 +74,26 @@ export function AiReportModal({ open, weeklyReport, nextWeekPlan, showNextWeekPl
 				<ReportSection>
 					<SectionHeader>
 						<Typography.Title level={5}>{t("sys.record.export.weeklyReportTitle")}</Typography.Title>
-						<Button type="button" size="sm" variant="outline" className="text-sm" onClick={() => void copyReport(weeklyReport)}>
+						<Button type="button" size="sm" variant="outline" className="text-sm" onClick={() => void copyReport(editableWeeklyReport)}>
 							<Icon icon="solar:copy-bold-duotone" size={16} />
 							{t("sys.record.export.copy")}
 						</Button>
 					</SectionHeader>
-					<ReportContent>
-						<Markdown>{weeklyReport}</Markdown>
+					<ReportContent role="button" tabIndex={0} onClick={() => setEditingSection("weekly")}>
+						{editingSection === "weekly" ? (
+							<Input.TextArea
+								autoFocus
+								value={editableWeeklyReport}
+								onChange={(event) => {
+									setWeeklyDirty(true);
+									setEditableWeeklyReport(event.target.value);
+								}}
+								onBlur={() => setEditingSection(null)}
+								autoSize={{ minRows: 4, maxRows: 12 }}
+							/>
+						) : (
+							<Markdown>{editableWeeklyReport}</Markdown>
+						)}
 					</ReportContent>
 				</ReportSection>
 
@@ -59,21 +101,34 @@ export function AiReportModal({ open, weeklyReport, nextWeekPlan, showNextWeekPl
 					<ReportSection>
 						<SectionHeader>
 							<Typography.Title level={5}>{t("sys.record.export.nextWeekPlanTitle")}</Typography.Title>
-							{nextWeekPlan && !nextWeekPlanLoading && (
-								<Button type="button" size="sm" variant="outline" className="text-sm" onClick={() => void copyReport(nextWeekPlan)}>
+							{editableNextWeekPlan && !nextWeekPlanLoading && (
+								<Button type="button" size="sm" variant="outline" className="text-sm" onClick={() => void copyReport(editableNextWeekPlan)}>
 									<Icon icon="solar:copy-bold-duotone" size={16} />
 									{t("sys.record.export.copy")}
 								</Button>
 							)}
 						</SectionHeader>
-						<ReportContent>
+						<ReportContent role="button" tabIndex={0} onClick={() => !nextWeekPlanLoading && setEditingSection("next")}>
 							{nextWeekPlanLoading ? (
 								<LoadingState>
 									<Spin size="small" />
 									<Typography.Text type="secondary">{t("sys.record.export.generatingNextWeekPlan")}</Typography.Text>
 								</LoadingState>
-							) : nextWeekPlan ? (
-								<Markdown>{nextWeekPlan}</Markdown>
+							) : editableNextWeekPlan ? (
+								editingSection === "next" ? (
+									<Input.TextArea
+										autoFocus
+										value={editableNextWeekPlan}
+										onChange={(event) => {
+											setNextDirty(true);
+											setEditableNextWeekPlan(event.target.value);
+										}}
+										onBlur={() => setEditingSection(null)}
+										autoSize={{ minRows: 4, maxRows: 12 }}
+									/>
+								) : (
+									<Markdown>{editableNextWeekPlan}</Markdown>
+								)
 							) : (
 								<Typography.Text type="secondary">{t("sys.record.export.aiEmpty")}</Typography.Text>
 							)}
@@ -89,5 +144,13 @@ const Actions = styled.div`display: flex; justify-content: flex-end; gap: 8px;`;
 const Reports = styled.div`display: flex; max-height: 65vh; flex-direction: column; gap: 16px; overflow-y: auto;`;
 const ReportSection = styled.section`display: flex; flex-direction: column; gap: 8px;`;
 const SectionHeader = styled.div`display: flex; align-items: center; justify-content: space-between; gap: 12px; .ant-typography { margin: 0; }`;
-const ReportContent = styled.div`min-height: 72px; padding: 16px; overflow: auto; border: 1px solid rgb(0 0 0 / 10%); border-radius: 10px; background: rgb(0 0 0 / 2%);`;
+const ReportContent = styled.div`
+	min-height: 72px;
+	padding: 16px;
+	overflow: auto;
+	border: 1px solid rgb(0 0 0 / 10%);
+	border-radius: 10px;
+	background: rgb(0 0 0 / 2%);
+	cursor: text;
+`;
 const LoadingState = styled.div`display: flex; min-height: 48px; align-items: center; justify-content: center; gap: 10px;`;
