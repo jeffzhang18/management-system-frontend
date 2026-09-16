@@ -1,4 +1,4 @@
-import axios, { AxiosHeaders, type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
+import axios, { type AxiosError, AxiosHeaders, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { toast } from "sonner";
 import type { Result } from "#/api";
 import { ResultStatus } from "#/enum";
@@ -9,8 +9,9 @@ import userStore from "@/store/userStore";
 const REFRESH_URL = "/auth/refresh-token";
 const TOAST_DEDUP_MS = 1200;
 
-type RequestConfigWithRetry = AxiosRequestConfig & {
+export type ApiRequestConfig = AxiosRequestConfig & {
 	_retry?: boolean;
+	suppressErrorToast?: boolean;
 };
 
 type RefreshTokenResponse = {
@@ -133,7 +134,7 @@ axiosInstance.interceptors.response.use(
 	(res: AxiosResponse<Result<any>>) => unwrapResult(res),
 	async (error: AxiosError<Result>) => {
 		const { response, message, config } = error || {};
-		const originalRequest = config as RequestConfigWithRetry | undefined;
+		const originalRequest = config as ApiRequestConfig | undefined;
 		const status = response?.status;
 		const requestUrl = originalRequest?.url || "";
 
@@ -150,34 +151,35 @@ axiosInstance.interceptors.response.use(
 						originalRequest.headers = headers;
 						return axiosInstance.request(originalRequest);
 					}
-				} catch {
-				}
+				} catch {}
 			}
 
 			clearAuthAndNotify();
 			return Promise.reject(error);
 		}
 
-		const errMsg = response?.data?.message || message || t("sys.api.errorMessage");
-		showErrorToastDedup(errMsg);
+		if (!originalRequest?.suppressErrorToast) {
+			const errMsg = response?.data?.message || message || t("sys.api.errorMessage");
+			showErrorToastDedup(errMsg);
+		}
 		return Promise.reject(error);
 	},
 );
 
 class APIClient {
-	get<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+	get<T = unknown>(config: ApiRequestConfig): Promise<T> {
 		return this.request<T>({ ...config, method: "GET" });
 	}
-	post<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+	post<T = unknown>(config: ApiRequestConfig): Promise<T> {
 		return this.request<T>({ ...config, method: "POST" });
 	}
-	put<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+	put<T = unknown>(config: ApiRequestConfig): Promise<T> {
 		return this.request<T>({ ...config, method: "PUT" });
 	}
-	delete<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+	delete<T = unknown>(config: ApiRequestConfig): Promise<T> {
 		return this.request<T>({ ...config, method: "DELETE" });
 	}
-	request<T = unknown>(config: AxiosRequestConfig): Promise<T> {
+	request<T = unknown>(config: ApiRequestConfig): Promise<T> {
 		return axiosInstance.request<any, T>(config);
 	}
 }

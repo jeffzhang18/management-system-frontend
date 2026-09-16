@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { NavLink } from "react-router";
+import { reportActivePageLeaveForLogout } from "@/components/analytics/user-browsing-tracker";
 import { useLoginStateContext } from "@/pages/sys/login/providers/login-provider";
 import { useRouter } from "@/routes/hooks";
 import { useUserActions, useUserInfo } from "@/store/userStore";
@@ -23,6 +24,7 @@ export default function AccountDropdown() {
 	const { t } = useTranslation();
 	const logout = () => {
 		try {
+			reportActivePageLeaveForLogout();
 			clearUserInfoAndToken();
 			backToLogin();
 		} catch (error) {
