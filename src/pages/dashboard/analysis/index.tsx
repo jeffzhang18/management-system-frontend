@@ -102,9 +102,40 @@ const buildAnalysisBuckets = (timeType: TimeType): AnalysisBucket[] => {
 	});
 };
 
+const getQueryDateRange = (query: AnalysisPeriodQuery): { startDate: string; endDate: string } => {
+	if (query.date) return { startDate: query.date, endDate: query.date };
+	if (query.startDate && query.endDate) return { startDate: query.startDate, endDate: query.endDate };
+	throw new Error("Analytics date range is unavailable");
+};
+
+const getPreviousPeriodQuery = (startDate: string, endDate: string): AnalysisPeriodQuery => {
+	const periodLength =
+		Math.round((parseDateKey(endDate).getTime() - parseDateKey(startDate).getTime()) / 86_400_000) + 1;
+	const previousEndDate = addDays(startDate, -1);
+	return {
+		startDate: addDays(previousEndDate, -(periodLength - 1)),
+		endDate: previousEndDate,
+	};
+};
+
 const getPercentChange = (current: number, previous: number) => {
-	if (previous === 0) return 0;
+	if (previous === 0) return current === 0 ? 0 : 100;
 	return Number((((current - previous) / previous) * 100).toFixed(1));
+};
+
+const getYAxisRange = (values: number[]) => {
+	if (values.length === 0 || values.every((value) => value === 0)) {
+		return { min: 0, max: 1 };
+	}
+
+	const minimum = Math.min(...values);
+	const maximum = Math.max(...values);
+	const padding = Math.max((maximum - minimum) * 0.15, maximum * 0.08, 1);
+
+	return {
+		min: Math.max(0, Math.floor(minimum - padding)),
+		max: Math.ceil(maximum + padding),
+	};
 };
 
 const formatDuration = (milliseconds: number) => {
@@ -120,27 +151,35 @@ const formatDuration = (milliseconds: number) => {
 
 const getWebAnalyticData = async (timeType: TimeType): Promise<WebAnalyticData> => {
 	const buckets = buildAnalysisBuckets(timeType);
+	const firstBucket = buckets.at(0);
 	const currentBucket = buckets.at(-1);
-	const previousBucket = buckets.at(-2);
 
-	if (!currentBucket || !previousBucket) throw new Error("Analytics periods are unavailable");
+	if (!firstBucket || !currentBucket) throw new Error("Analytics periods are unavailable");
 
-	const [pageViewResults, currentAverage, previousAverage] = await Promise.all([
+	const firstRange = getQueryDateRange(firstBucket.query);
+	const currentRange = getQueryDateRange(currentBucket.query);
+	const displayedPeriodQuery: AnalysisPeriodQuery = {
+		startDate: firstRange.startDate,
+		endDate: currentRange.endDate,
+	};
+	const previousPeriodQuery = getPreviousPeriodQuery(firstRange.startDate, currentRange.endDate);
+
+	const [pageViewResults, previousPageViews, currentAverage, previousAverage] = await Promise.all([
 		Promise.all(buckets.map((bucket) => analysisService.getTotalPageViews(bucket.query, true))),
-		analysisService.getAverageTimeOnPage(currentBucket.query, true),
-		analysisService.getAverageTimeOnPage(previousBucket.query, true),
+		analysisService.getTotalPageViews(previousPeriodQuery, true),
+		analysisService.getAverageTimeOnPage(displayedPeriodQuery, true),
+		analysisService.getAverageTimeOnPage(previousPeriodQuery, true),
 	]);
 
-	const pageViews = pageViewResults.at(-1)?.totalPageViews ?? 0;
-	const previousPageViews = pageViewResults.at(-2)?.totalPageViews ?? 0;
+	const pageViews = pageViewResults.reduce((total, result) => total + (result.totalPageViews || 0), 0);
 
 	return {
 		pageViews,
-		pageViewsChange: getPercentChange(pageViews, previousPageViews),
-		avgTime: formatDuration(currentAverage.averageTimeOnPageMs),
-		avgTimeChange: getPercentChange(currentAverage.averageTimeOnPageMs, previousAverage.averageTimeOnPageMs),
+		pageViewsChange: getPercentChange(pageViews, previousPageViews.totalPageViews || 0),
+		avgTime: formatDuration(currentAverage.averageTimeOnPageMs || 0),
+		avgTimeChange: getPercentChange(currentAverage.averageTimeOnPageMs || 0, previousAverage.averageTimeOnPageMs || 0),
 		chart: {
-			series: [{ name: "Page views", data: pageViewResults.map((result) => result.totalPageViews) }],
+			series: [{ name: "Page views", data: pageViewResults.map((result) => result.totalPageViews || 0) }],
 			categories: buckets.map((bucket) => bucket.label),
 		},
 	};
@@ -287,11 +326,15 @@ export default function Analysis() {
 	const sessionDevices = dashboardData.sessionDevices[timeType];
 	const topChannels = dashboardData.topChannels[timeType];
 	const trafficData = dashboardData.trafficData[timeType];
+	const chartValues = webAnalytic?.chart.series[0]?.data ?? [];
+	const yAxisRange = getYAxisRange(chartValues);
 
 	const chartOptions = useChart({
 		xaxis: { categories: webAnalytic?.chart.categories ?? [] },
 		yaxis: {
-			min: 0,
+			min: yAxisRange.min,
+			max: yAxisRange.max,
+			forceNiceScale: true,
 			labels: {
 				formatter: (value) => Math.round(value).toLocaleString(),
 			},
@@ -356,7 +399,7 @@ export default function Analysis() {
 
 			<div className="flex flex-col xl:grid grid-cols-4 gap-4">
 				{/* Web analytic 主图表卡片 */}
-				<Card className="col-span-4 xl:col-span-3">
+				<Card className="col-span-4 min-w-0 xl:col-span-3">
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle>
 							<Title as="h3" className="text-lg">
@@ -380,7 +423,7 @@ export default function Analysis() {
 								) : (
 									<div className="flex items-end gap-2">
 										<Title as="h3" className="text-2xl">
-											{webAnalytic?.pageViews.toLocaleString() ?? "--"}
+											{(webAnalytic?.pageViews ?? 0).toLocaleString()}
 										</Title>
 										{webAnalytic ? <Trend value={webAnalytic.pageViewsChange} /> : null}
 									</div>
@@ -395,17 +438,17 @@ export default function Analysis() {
 								) : (
 									<div className="flex items-end gap-2">
 										<Title as="h3" className="text-2xl">
-											{webAnalytic?.avgTime ?? "--"}
+											{webAnalytic?.avgTime ?? "0s"}
 										</Title>
 										{webAnalytic ? <Trend value={webAnalytic.avgTimeChange} /> : null}
 									</div>
 								)}
 							</div>
 						</div>
-						<div className="w-full min-h-[320px] mt-2 flex items-center justify-center">
+						<div className="w-full min-w-0 min-h-[320px] mt-2">
 							{webAnalyticLoading ? <Skeleton className="h-[300px] w-full" /> : null}
 							{webAnalyticError ? (
-								<div className="flex flex-col items-center gap-3 text-center">
+								<div className="flex min-h-[300px] flex-col items-center justify-center gap-3 text-center">
 									<Icon icon="mdi:chart-line-variant" size={36} className="text-muted-foreground" />
 									<Text variant="body2" className="text-muted-foreground">
 										Unable to load analytics data.

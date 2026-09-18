@@ -10,6 +10,8 @@ import { GLOBAL_CONFIG } from "./global-config";
 import { AntdAdapter } from "./theme/adapter/antd.adapter";
 import { ThemeProvider } from "./theme/theme-provider";
 
+const enableVercelAnalytics = import.meta.env.PROD && import.meta.env.VITE_APP_ENABLE_VERCEL_ANALYTICS === "true";
+
 if (import.meta.env.DEV) {
 	import("react-scan").then(({ scan }) => {
 		scan({
@@ -26,7 +28,7 @@ function App({ children }: { children: React.ReactNode }) {
 		<HelmetProvider>
 			<QueryClientProvider client={new QueryClient()}>
 				<ThemeProvider adapters={[AntdAdapter]}>
-					<VercelAnalytics debug={import.meta.env.PROD} />
+					{enableVercelAnalytics ? <VercelAnalytics /> : null}
 					<Helmet>
 						<title>{GLOBAL_CONFIG.appName}</title>
 						<link rel="icon" href={Logo} />

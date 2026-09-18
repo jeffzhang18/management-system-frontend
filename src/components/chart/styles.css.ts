@@ -1,9 +1,14 @@
+import { globalStyle, style } from "@vanilla-extract/css";
 import { themeVars } from "@/theme/theme.css";
 import { rgbAlpha } from "@/utils/theme";
-import { globalStyle } from "@vanilla-extract/css";
-import { style } from "@vanilla-extract/css";
 
-export const chartWrapper = style({}, "apexcharts-wrapper");
+export const chartWrapper = style(
+	{
+		width: "100%",
+		minWidth: 0,
+	},
+	"apexcharts-wrapper",
+);
 
 // TOOLTIP
 globalStyle(`${chartWrapper} .apexcharts-tooltip`, {
