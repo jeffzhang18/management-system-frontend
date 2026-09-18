@@ -1,3 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import analysisService, { type AnalysisPeriodQuery } from "@/api/services/analysisService";
 import { Chart } from "@/components/chart/chart";
 import { useChart } from "@/components/chart/useChart";
 import Icon from "@/components/icon/icon";
@@ -5,9 +8,9 @@ import { Button } from "@/ui/button";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/ui/card";
 import { Progress } from "@/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Skeleton } from "@/ui/skeleton";
 import { Text, Title } from "@/ui/typography";
 import { cn } from "@/utils";
-import { useState } from "react";
 
 // ---------------------- 数据区 ----------------------
 const timeOptions = [
@@ -16,52 +19,135 @@ const timeOptions = [
 	{ label: "Month", value: "month" },
 ];
 
+type TimeType = "day" | "week" | "month";
+
+type AnalysisBucket = {
+	label: string;
+	query: AnalysisPeriodQuery;
+};
+
+type WebAnalyticData = {
+	pageViews: number;
+	pageViewsChange: number;
+	avgTime: string;
+	avgTimeChange: number;
+	chart: {
+		series: { name: string; data: number[] }[];
+		categories: string[];
+	};
+};
+
+const parseDateKey = (dateKey: string) => {
+	const [year, month, day] = dateKey.split("-").map(Number);
+	return new Date(Date.UTC(year, month - 1, day));
+};
+
+const toDateKey = (date: Date) =>
+	`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+
+const addDays = (dateKey: string, amount: number) => {
+	const date = parseDateKey(dateKey);
+	date.setUTCDate(date.getUTCDate() + amount);
+	return toDateKey(date);
+};
+
+const addMonths = (dateKey: string, amount: number) => {
+	const date = parseDateKey(dateKey);
+	date.setUTCMonth(date.getUTCMonth() + amount, 1);
+	return toDateKey(date);
+};
+
+const getChinaToday = () => {
+	const parts = new Intl.DateTimeFormat("en-US", {
+		timeZone: "Asia/Shanghai",
+		year: "numeric",
+		month: "2-digit",
+		day: "2-digit",
+	}).formatToParts(new Date());
+	const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+	return `${values.year}-${values.month}-${values.day}`;
+};
+
+const formatDateLabel = (dateKey: string, includeYear = false) =>
+	new Intl.DateTimeFormat("en-US", {
+		timeZone: "UTC",
+		month: "short",
+		day: includeYear ? undefined : "numeric",
+		year: includeYear ? "2-digit" : undefined,
+	}).format(parseDateKey(dateKey));
+
+const buildAnalysisBuckets = (timeType: TimeType): AnalysisBucket[] => {
+	const today = getChinaToday();
+
+	if (timeType === "day") {
+		return Array.from({ length: 12 }, (_, index) => {
+			const date = addDays(today, index - 11);
+			return { label: formatDateLabel(date), query: { date } };
+		});
+	}
+
+	if (timeType === "week") {
+		return Array.from({ length: 12 }, (_, index) => {
+			const endDate = addDays(today, (index - 11) * 7);
+			const startDate = addDays(endDate, -6);
+			return { label: formatDateLabel(endDate), query: { startDate, endDate } };
+		});
+	}
+
+	const currentMonthStart = `${today.slice(0, 7)}-01`;
+	return Array.from({ length: 12 }, (_, index) => {
+		const startDate = addMonths(currentMonthStart, index - 11);
+		const endDate = addDays(addMonths(startDate, 1), -1);
+		return { label: formatDateLabel(startDate, true), query: { startDate, endDate } };
+	});
+};
+
+const getPercentChange = (current: number, previous: number) => {
+	if (previous === 0) return 0;
+	return Number((((current - previous) / previous) * 100).toFixed(1));
+};
+
+const formatDuration = (milliseconds: number) => {
+	const totalSeconds = Math.max(0, Math.round(milliseconds / 1000));
+	const hours = Math.floor(totalSeconds / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+	if (minutes > 0) return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+	return `${seconds}s`;
+};
+
+const getWebAnalyticData = async (timeType: TimeType): Promise<WebAnalyticData> => {
+	const buckets = buildAnalysisBuckets(timeType);
+	const currentBucket = buckets.at(-1);
+	const previousBucket = buckets.at(-2);
+
+	if (!currentBucket || !previousBucket) throw new Error("Analytics periods are unavailable");
+
+	const [pageViewResults, currentAverage, previousAverage] = await Promise.all([
+		Promise.all(buckets.map((bucket) => analysisService.getTotalPageViews(bucket.query, true))),
+		analysisService.getAverageTimeOnPage(currentBucket.query, true),
+		analysisService.getAverageTimeOnPage(previousBucket.query, true),
+	]);
+
+	const pageViews = pageViewResults.at(-1)?.totalPageViews ?? 0;
+	const previousPageViews = pageViewResults.at(-2)?.totalPageViews ?? 0;
+
+	return {
+		pageViews,
+		pageViewsChange: getPercentChange(pageViews, previousPageViews),
+		avgTime: formatDuration(currentAverage.averageTimeOnPageMs),
+		avgTimeChange: getPercentChange(currentAverage.averageTimeOnPageMs, previousAverage.averageTimeOnPageMs),
+		chart: {
+			series: [{ name: "Page views", data: pageViewResults.map((result) => result.totalPageViews) }],
+			categories: buckets.map((bucket) => bucket.label),
+		},
+	};
+};
+
 // 所有数据都按 day/week/month 维度组织
 const dashboardData = {
-	webAnalytic: {
-		day: {
-			pageViews: 32124,
-			pageViewsChange: 4.2,
-			avgTime: "3m 16s",
-			avgTimeChange: -0.2,
-			chart: {
-				series: [
-					{ name: "Natural", data: [40000, 60000, 90000, 100000, 80000, 70000, 60000, 50000, 70000, 90000, 80000, 90000] },
-					{ name: "Referral", data: [30000, 40000, 50000, 60000, 50000, 40000, 30000, 40000, 50000, 60000, 50000, 40000] },
-					{ name: "Direct", data: [50000, 60000, 40000, 30000, 40000, 50000, 60000, 70000, 80000, 70000, 60000, 50000] },
-				],
-				categories: ["01 Jun", "02 Jun", "03 Jun", "04 Jun", "05 Jun", "06 Jun", "07 Jun", "08 Jun", "09 Jun", "10 Jun", "11 Jun", "12 Jun"],
-			},
-		},
-		week: {
-			pageViews: 210324,
-			pageViewsChange: 2.1,
-			avgTime: "3m 10s",
-			avgTimeChange: -0.5,
-			chart: {
-				series: [
-					{ name: "Natural", data: [400000, 600000, 900000, 1000000, 800000, 700000, 600000, 500000, 700000, 900000, 800000, 900000] },
-					{ name: "Referral", data: [300000, 400000, 500000, 600000, 500000, 400000, 300000, 400000, 500000, 600000, 500000, 400000] },
-					{ name: "Direct", data: [500000, 600000, 400000, 300000, 400000, 500000, 600000, 700000, 800000, 700000, 600000, 500000] },
-				],
-				categories: ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6", "Week 7", "Week 8", "Week 9", "Week 10", "Week 11", "Week 12"],
-			},
-		},
-		month: {
-			pageViews: 420354,
-			pageViewsChange: 4.8,
-			avgTime: "3m 18s",
-			avgTimeChange: -0.3,
-			chart: {
-				series: [
-					{ name: "Natural", data: [50000, 60000, 65000, 67000, 62000, 64000, 66000, 68000, 69000, 70000, 71000, 72000] },
-					{ name: "Referral", data: [40000, 42000, 43000, 44000, 45000, 46000, 47000, 48000, 49000, 50000, 51000, 52000] },
-					{ name: "Direct", data: [45000, 47000, 48000, 49000, 50000, 51000, 52000, 53000, 54000, 55000, 56000, 57000] },
-				],
-				categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-			},
-		},
-	},
 	visitor: {
 		day: { value: 149328, change: 5.2, tip: "vs last day" },
 		week: { value: 749853, change: 8.4, tip: "vs last week" },
@@ -181,8 +267,19 @@ function Trend({ value }: { value: number }) {
 }
 
 export default function Analysis() {
-	const [timeType, setTimeType] = useState<"day" | "week" | "month">("day");
-	const webAnalytic = dashboardData.webAnalytic[timeType];
+	const [timeType, setTimeType] = useState<TimeType>("day");
+	const {
+		data: webAnalytic,
+		isLoading: webAnalyticLoading,
+		isFetching: webAnalyticFetching,
+		isError: webAnalyticError,
+		refetch: refetchWebAnalytic,
+	} = useQuery({
+		queryKey: ["analysis", "web-analytic", timeType],
+		queryFn: () => getWebAnalyticData(timeType),
+		staleTime: 60_000,
+		retry: 1,
+	});
 	const visitor = dashboardData.visitor[timeType];
 	const conversionRate = dashboardData.conversionRate[timeType];
 	const adCampaign = dashboardData.adCampaign[timeType];
@@ -192,7 +289,18 @@ export default function Analysis() {
 	const trafficData = dashboardData.trafficData[timeType];
 
 	const chartOptions = useChart({
-		xaxis: { categories: webAnalytic.chart.categories },
+		xaxis: { categories: webAnalytic?.chart.categories ?? [] },
+		yaxis: {
+			min: 0,
+			labels: {
+				formatter: (value) => Math.round(value).toLocaleString(),
+			},
+		},
+		tooltip: {
+			y: {
+				formatter: (value) => `${Math.round(value).toLocaleString()} views`,
+			},
+		},
 	});
 
 	const deviceChartOptions = useChart({
@@ -255,6 +363,11 @@ export default function Analysis() {
 								Web analytic
 							</Title>
 						</CardTitle>
+						{webAnalyticFetching && !webAnalyticLoading ? (
+							<CardAction>
+								<Icon icon="mdi:loading" className="animate-spin text-muted-foreground" size={18} />
+							</CardAction>
+						) : null}
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2">
 						<div className="flex flex-wrap gap-6 items-center">
@@ -262,27 +375,49 @@ export default function Analysis() {
 								<Text variant="subTitle2" className="text-muted-foreground">
 									Page views
 								</Text>
-								<div className="flex items-end gap-2">
-									<Title as="h3" className="text-2xl">
-										{webAnalytic.pageViews.toLocaleString()}
-									</Title>
-									<Trend value={webAnalytic.pageViewsChange} />
-								</div>
+								{webAnalyticLoading ? (
+									<Skeleton className="mt-1 h-8 w-32" />
+								) : (
+									<div className="flex items-end gap-2">
+										<Title as="h3" className="text-2xl">
+											{webAnalytic?.pageViews.toLocaleString() ?? "--"}
+										</Title>
+										{webAnalytic ? <Trend value={webAnalytic.pageViewsChange} /> : null}
+									</div>
+								)}
 							</div>
 							<div>
 								<Text variant="subTitle2" className="text-muted-foreground">
 									Avg. Time on page
 								</Text>
-								<div className="flex items-end gap-2">
-									<Title as="h3" className="text-2xl">
-										{webAnalytic.avgTime}
-									</Title>
-									<Trend value={webAnalytic.avgTimeChange} />
-								</div>
+								{webAnalyticLoading ? (
+									<Skeleton className="mt-1 h-8 w-32" />
+								) : (
+									<div className="flex items-end gap-2">
+										<Title as="h3" className="text-2xl">
+											{webAnalytic?.avgTime ?? "--"}
+										</Title>
+										{webAnalytic ? <Trend value={webAnalytic.avgTimeChange} /> : null}
+									</div>
+								)}
 							</div>
 						</div>
-						<div className="w-full min-h-[200px] mt-2">
-							<Chart type="line" height={320} options={chartOptions} series={webAnalytic.chart.series} />
+						<div className="w-full min-h-[320px] mt-2 flex items-center justify-center">
+							{webAnalyticLoading ? <Skeleton className="h-[300px] w-full" /> : null}
+							{webAnalyticError ? (
+								<div className="flex flex-col items-center gap-3 text-center">
+									<Icon icon="mdi:chart-line-variant" size={36} className="text-muted-foreground" />
+									<Text variant="body2" className="text-muted-foreground">
+										Unable to load analytics data.
+									</Text>
+									<Button size="sm" variant="outline" onClick={() => refetchWebAnalytic()}>
+										Try again
+									</Button>
+								</div>
+							) : null}
+							{webAnalytic ? (
+								<Chart type="line" height={320} options={chartOptions} series={webAnalytic.chart.series} />
+							) : null}
 						</div>
 					</CardContent>
 				</Card>
@@ -417,7 +552,12 @@ export default function Analysis() {
 					<CardContent>
 						<div className="flex flex-col items-center gap-2">
 							<div className="w-full max-w-[180px]">
-								<Chart type="donut" height={320} options={deviceChartOptions} series={sessionDevices.map((d) => d.value)} />
+								<Chart
+									type="donut"
+									height={320}
+									options={deviceChartOptions}
+									series={sessionDevices.map((d) => d.value)}
+								/>
 							</div>
 							<div className="flex justify-center gap-4 mt-2">
 								{sessionDevices.map((d) => (
