@@ -1,9 +1,15 @@
-import { Empty, List, Popconfirm, Space, Tag, Typography } from "antd";
-import styled from "styled-components";
+import { Empty, List, Pagination, Popconfirm, Space, Tag, Typography } from "antd";
 import { useTranslation } from "react-i18next";
+import styled from "styled-components";
 import { Icon } from "@/components/icon";
 import { Button } from "@/ui/button";
-import { getRecordTheme, getRecordThemeLabel, getRecordTimeLabel, type RecordThemeOption, type WorkRecord } from "./types";
+import {
+	getRecordTheme,
+	getRecordThemeLabel,
+	getRecordTimeLabel,
+	type RecordThemeOption,
+	type WorkRecord,
+} from "./types";
 
 interface Props {
 	records: WorkRecord[];
@@ -16,20 +22,23 @@ interface Props {
 
 const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = false, pageSize = 8 }: Props) => {
 	const { t } = useTranslation();
-	if (!records.length) return <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("sys.record.emptyDay")} />;
+	const isEmpty = records.length === 0;
 
 	return (
 		<ListContainer $pageSize={enablePagination ? pageSize : undefined}>
 			<List
 				className="record-list"
 				data-paginated={enablePagination || undefined}
-				data-single-page={(enablePagination && records.length <= pageSize) || undefined}
+				data-single-page={(enablePagination && !isEmpty && records.length <= pageSize) || undefined}
 				pagination={
-					enablePagination
+					enablePagination && !isEmpty
 						? { pageSize, size: "small", hideOnSinglePage: false, showSizeChanger: false }
 						: false
 				}
 				dataSource={records}
+				locale={{
+					emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t("sys.record.emptyDay")} />,
+				}}
 				renderItem={(record) => {
 					const theme = getRecordTheme(record.theme, themes);
 					return (
@@ -46,16 +55,16 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 										onDelete(record.id);
 									}}
 								>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									className="size-8 text-destructive hover:text-destructive"
-									onClick={(event) => event.stopPropagation()}
-									aria-label={t("sys.record.deleteRecord")}
-								>
-									<Icon icon="solar:trash-bin-trash-bold-duotone" size={16} />
-								</Button>
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon"
+										className="size-8 text-destructive hover:text-destructive"
+										onClick={(event) => event.stopPropagation()}
+										aria-label={t("sys.record.deleteRecord")}
+									>
+										<Icon icon="solar:trash-bin-trash-bold-duotone" size={16} />
+									</Button>
 								</Popconfirm>,
 							]}
 							onClick={() => onSelect(record)}
@@ -80,6 +89,11 @@ const RecordList = ({ records, themes, onSelect, onDelete, enablePagination = fa
 					);
 				}}
 			/>
+			{enablePagination && isEmpty && (
+				<EmptyPagination aria-hidden="true">
+					<Pagination current={1} total={1} pageSize={pageSize} size="small" showSizeChanger={false} />
+				</EmptyPagination>
+			)}
 		</ListContainer>
 	);
 };
@@ -91,6 +105,7 @@ const ListContainer = styled.div<{ $pageSize?: number }>`
 	display: flex;
 	flex: 1;
 	min-height: 0;
+	flex-direction: column;
 
 	.record-list.ant-list {
 		display: flex;
@@ -179,4 +194,14 @@ const ListContainer = styled.div<{ $pageSize?: number }>`
 	}
 `;
 
+const EmptyPagination = styled.div`
+	flex: none;
+	margin-block-start: 12px;
+	text-align: center;
+	visibility: hidden;
+	pointer-events: none;
 
+	.ant-pagination {
+		justify-content: center;
+	}
+`;
