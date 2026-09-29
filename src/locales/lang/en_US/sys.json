@@ -292,6 +292,69 @@
 			"fullscreen": "FullScreen",
 			"refresh": "Refresh"
 		},
+		"analysis": {
+			"title": "Analysis overview",
+			"subtitle": "Explore the metrics to understand trends and drive decisions.",
+			"showBy": "Show by:",
+			"time": {
+				"week": "Week",
+				"month": "Month"
+			},
+			"webAnalytic": "Web analytic",
+			"today": "Today",
+			"previousWeek": "Previous week",
+			"previousMonth": "Previous month",
+			"nextWeek": "Next week",
+			"nextMonth": "Next month",
+			"loadFailed": "Unable to load analytics data.",
+			"tryAgain": "Try again",
+			"exportData": "Export data",
+			"topPages": "Top pages",
+			"sessionDevices": "Session devices",
+			"topChannel": "Top channel",
+			"trafficData": "Traffic data",
+			"metrics": {
+				"pageViews": "Page views",
+				"avgTimeOnPage": "Avg. Time on page",
+				"visitor": "Visitor",
+				"conversionRate": "Conversion rate",
+				"adCampaignClicks": "Ad campaign clicks"
+			},
+			"comparison": {
+				"lastDay": "vs last day",
+				"lastWeek": "vs last week",
+				"lastMonth": "vs last month",
+				"lastYear": "vs last year"
+			},
+			"devices": {
+				"desktop": "Desktop",
+				"mobile": "Mobile",
+				"tablet": "Tablet"
+			},
+			"sources": {
+				"direct": "Direct",
+				"natural": "Natural",
+				"referral": "Referral",
+				"socialMedia": "Social Media",
+				"emailCampaign": "Email Campaign"
+			},
+			"chart": {
+				"viewsTooltip": "{{value}} views"
+			},
+			"table": {
+				"pageUrl": "PAGE URL",
+				"views": "VIEWS",
+				"uniqueVisitors": "UNIQUE VISITORS",
+				"channel": "CHANNEL",
+				"percentage": "PERCENTAGE",
+				"total": "TOTAL",
+				"source": "SOURCE",
+				"visits": "VISITS",
+				"bounceRate": "BOUNCE RATE",
+				"avgSessionDuration": "AVG. SESSION DURATION",
+				"progressToGoal": "PROGRESS TO GOAL (%)"
+			}
+		},
 		"record": {
 			"title": "Work Records",
 			"subtitle": "Calendar workspace",
@@ -441,8 +504,3 @@
 		}
 	}
 }
-
-
-
-
-

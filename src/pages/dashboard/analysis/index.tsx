@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import analysisService, { type PageViewsQuery } from "@/api/services/analysisService";
 import { Chart } from "@/components/chart/chart";
 import { useChart } from "@/components/chart/useChart";
@@ -12,14 +13,7 @@ import { Skeleton } from "@/ui/skeleton";
 import { Text, Title } from "@/ui/typography";
 import { cn } from "@/utils";
 
-// ---------------------- 数据区 ----------------------
-const timeOptions = [
-	{ label: "Day", value: "day" },
-	{ label: "Week", value: "week" },
-	{ label: "Month", value: "month" },
-];
-
-type TimeType = "day" | "week" | "month";
+type TimeType = "day" | "month";
 
 type AnalysisBucket = {
 	label: string;
@@ -34,6 +28,7 @@ type WebAnalyticData = {
 	chart: {
 		series: { name: string; data: number[] }[];
 		categories: string[];
+		avgTimes: string[];
 	};
 };
 
@@ -68,48 +63,47 @@ const getChinaToday = () => {
 	return `${values.year}-${values.month}-${values.day}`;
 };
 
-const formatDateLabel = (dateKey: string, includeYear = false) =>
-	new Intl.DateTimeFormat("en-US", {
+const formatDateLabel = (dateKey: string, locale: string, weekday = false) =>
+	new Intl.DateTimeFormat(locale, {
 		timeZone: "UTC",
+		weekday: weekday ? "short" : undefined,
 		month: "short",
-		day: includeYear ? undefined : "numeric",
-		year: includeYear ? "2-digit" : undefined,
+		day: "numeric",
 	}).format(parseDateKey(dateKey));
 
-const buildAnalysisBuckets = (timeType: TimeType): AnalysisBucket[] => {
-	const today = getChinaToday();
-
+const getDisplayedPeriod = (timeType: TimeType, offset: number, today: string): PageViewsQuery => {
 	if (timeType === "day") {
-		return Array.from({ length: 7 }, (_, index) => {
-			const date = addDays(today, index - 6);
-			return { label: formatDateLabel(date), query: { startDate: date, endDate: date } };
-		});
+		const startDate = addDays(today, -parseDateKey(today).getUTCDay() + offset * 7);
+		return { startDate, endDate: addDays(startDate, 6) };
 	}
 
-	if (timeType === "week") {
-		return Array.from({ length: 8 }, (_, index) => {
-			const endDate = addDays(today, (index - 7) * 7);
-			const startDate = addDays(endDate, -6);
-			return { label: formatDateLabel(endDate), query: { startDate, endDate } };
-		});
-	}
-
-	const currentMonthStart = `${today.slice(0, 7)}-01`;
-	return Array.from({ length: 12 }, (_, index) => {
-		const startDate = addMonths(currentMonthStart, index - 11);
-		const endDate = addDays(addMonths(startDate, 1), -1);
-		return { label: formatDateLabel(startDate, true), query: { startDate, endDate } };
-	});
+	const startDate = addMonths(`${today.slice(0, 7)}-01`, offset);
+	return { startDate, endDate: addDays(addMonths(startDate, 1), -1) };
 };
 
-const getPreviousPeriodQuery = (startDate: string, endDate: string): PageViewsQuery => {
-	const periodLength =
-		Math.round((parseDateKey(endDate).getTime() - parseDateKey(startDate).getTime()) / 86_400_000) + 1;
-	const previousEndDate = addDays(startDate, -1);
-	return {
-		startDate: addDays(previousEndDate, -(periodLength - 1)),
-		endDate: previousEndDate,
-	};
+const buildAnalysisBuckets = (timeType: TimeType, period: PageViewsQuery, locale: string): AnalysisBucket[] => {
+	const buckets: AnalysisBucket[] = [];
+	for (let date = period.startDate; date <= period.endDate; date = addDays(date, 1)) {
+		buckets.push({
+			label: formatDateLabel(date, locale, timeType === "day"),
+			query: { startDate: date, endDate: date },
+		});
+	}
+	return buckets;
+};
+
+const getPreviousPeriodQuery = (timeType: TimeType, period: PageViewsQuery): PageViewsQuery =>
+	getDisplayedPeriod(timeType, -1, period.startDate);
+
+const formatPeriodLabel = (timeType: TimeType, period: PageViewsQuery, locale: string) => {
+	const formatter = new Intl.DateTimeFormat(locale, {
+		timeZone: "UTC",
+		year: "numeric",
+		month: "short",
+		day: timeType === "day" ? "numeric" : undefined,
+	});
+	if (timeType === "month") return formatter.format(parseDateKey(period.startDate));
+	return `${formatter.format(parseDateKey(period.startDate))} – ${formatter.format(parseDateKey(period.endDate))}`;
 };
 
 const getPercentChange = (current: number, previous: number) => {
@@ -143,24 +137,21 @@ const formatDuration = (milliseconds: number) => {
 	return `${seconds}s`;
 };
 
-const getWebAnalyticData = async (timeType: TimeType): Promise<WebAnalyticData> => {
-	const buckets = buildAnalysisBuckets(timeType);
-	const firstBucket = buckets.at(0);
-	const currentBucket = buckets.at(-1);
-
-	if (!firstBucket || !currentBucket) throw new Error("Analytics periods are unavailable");
-
-	const displayedPeriodQuery: PageViewsQuery = {
-		startDate: firstBucket.query.startDate,
-		endDate: currentBucket.query.endDate,
-	};
-	const previousPeriodQuery = getPreviousPeriodQuery(displayedPeriodQuery.startDate, displayedPeriodQuery.endDate);
+const getWebAnalyticData = async (
+	timeType: TimeType,
+	displayedPeriodQuery: PageViewsQuery,
+	locale: string,
+	pageViewsLabel: string,
+): Promise<WebAnalyticData> => {
+	const buckets = buildAnalysisBuckets(timeType, displayedPeriodQuery, locale);
+	const previousPeriodQuery = getPreviousPeriodQuery(timeType, displayedPeriodQuery);
 
 	const [current, previous] = await Promise.all([
 		analysisService.getPageViews(displayedPeriodQuery, true),
 		analysisService.getPageViews(previousPeriodQuery, true),
 	]);
 	const pageViewsByDate = new Map(current.daily.map((item) => [item.date, item.pageViews]));
+	const avgTimeByDate = new Map(current.daily.map((item) => [item.date, item.averageTimeOnPageMs]));
 	const chartData = buckets.map((bucket) => {
 		let total = 0;
 		for (let date = bucket.query.startDate; date <= bucket.query.endDate; date = addDays(date, 1)) {
@@ -178,8 +169,9 @@ const getWebAnalyticData = async (timeType: TimeType): Promise<WebAnalyticData> 
 			previous.summary.averageTimeOnPageMs || 0,
 		),
 		chart: {
-			series: [{ name: "Page views", data: chartData }],
+			series: [{ name: pageViewsLabel, data: chartData }],
 			categories: buckets.map((bucket) => bucket.label),
+			avgTimes: buckets.map((bucket) => formatDuration(avgTimeByDate.get(bucket.query.startDate) ?? 0)),
 		},
 	};
 };
@@ -187,19 +179,19 @@ const getWebAnalyticData = async (timeType: TimeType): Promise<WebAnalyticData> 
 // 所有数据都按 day/week/month 维度组织
 const dashboardData = {
 	visitor: {
-		day: { value: 149328, change: 5.2, tip: "vs last day" },
-		week: { value: 749853, change: 8.4, tip: "vs last week" },
-		month: { value: 1749853, change: 12.4, tip: "vs last year" },
+		day: { value: 149328, change: 5.2, tipKey: "sys.analysis.comparison.lastDay" },
+		week: { value: 749853, change: 8.4, tipKey: "sys.analysis.comparison.lastWeek" },
+		month: { value: 1749853, change: 12.4, tipKey: "sys.analysis.comparison.lastYear" },
 	},
 	conversionRate: {
-		day: { value: 6.8, change: -1.8, tip: "vs last day" },
-		week: { value: 7.0, change: 0.2, tip: "vs last week" },
-		month: { value: 7.2, change: 0.8, tip: "vs last year" },
+		day: { value: 6.8, change: -1.8, tipKey: "sys.analysis.comparison.lastDay" },
+		week: { value: 7.0, change: 0.2, tipKey: "sys.analysis.comparison.lastWeek" },
+		month: { value: 7.2, change: 0.8, tipKey: "sys.analysis.comparison.lastYear" },
 	},
 	adCampaign: {
-		day: { value: 17333, change: 2.3, tip: "vs last day" },
-		week: { value: 114987, change: 6.1, tip: "vs last week" },
-		month: { value: 214987, change: 15.6, tip: "vs last year" },
+		day: { value: 17333, change: 2.3, tipKey: "sys.analysis.comparison.lastDay" },
+		week: { value: 114987, change: 6.1, tipKey: "sys.analysis.comparison.lastWeek" },
+		month: { value: 214987, change: 15.6, tipKey: "sys.analysis.comparison.lastYear" },
 	},
 	topPages: {
 		day: [
@@ -229,19 +221,19 @@ const dashboardData = {
 	},
 	sessionDevices: {
 		day: [
-			{ label: "Desktop", value: 42.1, color: "#3b82f6", icon: "mdi:desktop-mac" },
-			{ label: "Mobile", value: 33.7, color: "#f59e42", icon: "mdi:cellphone" },
-			{ label: "Tablet", value: 19.6, color: "#6366f1", icon: "mdi:tablet" },
+			{ labelKey: "sys.analysis.devices.desktop", value: 42.1, color: "#3b82f6", icon: "mdi:desktop-mac" },
+			{ labelKey: "sys.analysis.devices.mobile", value: 33.7, color: "#f59e42", icon: "mdi:cellphone" },
+			{ labelKey: "sys.analysis.devices.tablet", value: 19.6, color: "#6366f1", icon: "mdi:tablet" },
 		],
 		week: [
-			{ label: "Desktop", value: 42.1, color: "#3b82f6", icon: "mdi:desktop-mac" },
-			{ label: "Mobile", value: 33.7, color: "#f59e42", icon: "mdi:cellphone" },
-			{ label: "Tablet", value: 19.6, color: "#6366f1", icon: "mdi:tablet" },
+			{ labelKey: "sys.analysis.devices.desktop", value: 42.1, color: "#3b82f6", icon: "mdi:desktop-mac" },
+			{ labelKey: "sys.analysis.devices.mobile", value: 33.7, color: "#f59e42", icon: "mdi:cellphone" },
+			{ labelKey: "sys.analysis.devices.tablet", value: 19.6, color: "#6366f1", icon: "mdi:tablet" },
 		],
 		month: [
-			{ label: "Desktop", value: 42.1, color: "#3b82f6", icon: "mdi:desktop-mac" },
-			{ label: "Mobile", value: 33.7, color: "#f59e42", icon: "mdi:cellphone" },
-			{ label: "Tablet", value: 19.6, color: "#6366f1", icon: "mdi:tablet" },
+			{ labelKey: "sys.analysis.devices.desktop", value: 42.1, color: "#3b82f6", icon: "mdi:desktop-mac" },
+			{ labelKey: "sys.analysis.devices.mobile", value: 33.7, color: "#f59e42", icon: "mdi:cellphone" },
+			{ labelKey: "sys.analysis.devices.tablet", value: 19.6, color: "#6366f1", icon: "mdi:tablet" },
 		],
 	},
 	topChannels: {
@@ -266,25 +258,130 @@ const dashboardData = {
 	},
 	trafficData: {
 		day: [
-			{ source: "Direct", visits: 1500, unique: 1200, bounce: 40, duration: "00:03:45", progress: 60 },
-			{ source: "Natural", visits: 3000, unique: 2500, bounce: 35, duration: "00:04:20", progress: 75 },
-			{ source: "Referral", visits: 1000, unique: 850, bounce: 45, duration: "00:03:10", progress: 80 },
-			{ source: "Social Media", visits: 2000, unique: 1800, bounce: 50, duration: "00:02:50", progress: 40 },
-			{ source: "Email Campaign", visits: 800, unique: 700, bounce: 30, duration: "00:05:00", progress: 55 },
+			{
+				sourceKey: "sys.analysis.sources.direct",
+				visits: 1500,
+				unique: 1200,
+				bounce: 40,
+				duration: "00:03:45",
+				progress: 60,
+			},
+			{
+				sourceKey: "sys.analysis.sources.natural",
+				visits: 3000,
+				unique: 2500,
+				bounce: 35,
+				duration: "00:04:20",
+				progress: 75,
+			},
+			{
+				sourceKey: "sys.analysis.sources.referral",
+				visits: 1000,
+				unique: 850,
+				bounce: 45,
+				duration: "00:03:10",
+				progress: 80,
+			},
+			{
+				sourceKey: "sys.analysis.sources.socialMedia",
+				visits: 2000,
+				unique: 1800,
+				bounce: 50,
+				duration: "00:02:50",
+				progress: 40,
+			},
+			{
+				sourceKey: "sys.analysis.sources.emailCampaign",
+				visits: 800,
+				unique: 700,
+				bounce: 30,
+				duration: "00:05:00",
+				progress: 55,
+			},
 		],
 		week: [
-			{ source: "Direct", visits: 11500, unique: 11200, bounce: 38, duration: "00:03:35", progress: 62 },
-			{ source: "Natural", visits: 23000, unique: 22500, bounce: 33, duration: "00:04:10", progress: 78 },
-			{ source: "Referral", visits: 11000, unique: 9850, bounce: 43, duration: "00:03:00", progress: 82 },
-			{ source: "Social Media", visits: 12000, unique: 11800, bounce: 48, duration: "00:02:40", progress: 45 },
-			{ source: "Email Campaign", visits: 3800, unique: 3700, bounce: 28, duration: "00:05:10", progress: 59 },
+			{
+				sourceKey: "sys.analysis.sources.direct",
+				visits: 11500,
+				unique: 11200,
+				bounce: 38,
+				duration: "00:03:35",
+				progress: 62,
+			},
+			{
+				sourceKey: "sys.analysis.sources.natural",
+				visits: 23000,
+				unique: 22500,
+				bounce: 33,
+				duration: "00:04:10",
+				progress: 78,
+			},
+			{
+				sourceKey: "sys.analysis.sources.referral",
+				visits: 11000,
+				unique: 9850,
+				bounce: 43,
+				duration: "00:03:00",
+				progress: 82,
+			},
+			{
+				sourceKey: "sys.analysis.sources.socialMedia",
+				visits: 12000,
+				unique: 11800,
+				bounce: 48,
+				duration: "00:02:40",
+				progress: 45,
+			},
+			{
+				sourceKey: "sys.analysis.sources.emailCampaign",
+				visits: 3800,
+				unique: 3700,
+				bounce: 28,
+				duration: "00:05:10",
+				progress: 59,
+			},
 		],
 		month: [
-			{ source: "Direct", visits: 31500, unique: 31200, bounce: 36, duration: "00:03:25", progress: 65 },
-			{ source: "Natural", visits: 53000, unique: 52500, bounce: 31, duration: "00:04:00", progress: 80 },
-			{ source: "Referral", visits: 21000, unique: 19850, bounce: 41, duration: "00:02:50", progress: 85 },
-			{ source: "Social Media", visits: 22000, unique: 21800, bounce: 46, duration: "00:02:30", progress: 50 },
-			{ source: "Email Campaign", visits: 7800, unique: 7700, bounce: 26, duration: "00:05:20", progress: 63 },
+			{
+				sourceKey: "sys.analysis.sources.direct",
+				visits: 31500,
+				unique: 31200,
+				bounce: 36,
+				duration: "00:03:25",
+				progress: 65,
+			},
+			{
+				sourceKey: "sys.analysis.sources.natural",
+				visits: 53000,
+				unique: 52500,
+				bounce: 31,
+				duration: "00:04:00",
+				progress: 80,
+			},
+			{
+				sourceKey: "sys.analysis.sources.referral",
+				visits: 21000,
+				unique: 19850,
+				bounce: 41,
+				duration: "00:02:50",
+				progress: 85,
+			},
+			{
+				sourceKey: "sys.analysis.sources.socialMedia",
+				visits: 22000,
+				unique: 21800,
+				bounce: 46,
+				duration: "00:02:30",
+				progress: 50,
+			},
+			{
+				sourceKey: "sys.analysis.sources.emailCampaign",
+				visits: 7800,
+				unique: 7700,
+				bounce: 26,
+				duration: "00:05:20",
+				progress: 63,
+			},
 		],
 	},
 };
@@ -305,7 +402,15 @@ function Trend({ value }: { value: number }) {
 }
 
 export default function Analysis() {
+	const { t, i18n } = useTranslation();
 	const [timeType, setTimeType] = useState<TimeType>("day");
+	const [periodOffset, setPeriodOffset] = useState(0);
+	const displayedPeriod = getDisplayedPeriod(timeType, periodOffset, getChinaToday());
+	const locale = i18n.language === "zh_CN" ? "zh-CN" : "en-US";
+	const timeOptions = [
+		{ label: t("sys.analysis.time.week"), value: "day" },
+		{ label: t("sys.analysis.time.month"), value: "month" },
+	];
 	const {
 		data: webAnalytic,
 		isLoading: webAnalyticLoading,
@@ -313,8 +418,8 @@ export default function Analysis() {
 		isError: webAnalyticError,
 		refetch: refetchWebAnalytic,
 	} = useQuery({
-		queryKey: ["analysis", "web-analytic", timeType],
-		queryFn: () => getWebAnalyticData(timeType),
+		queryKey: ["analysis", "web-analytic", timeType, displayedPeriod.startDate, displayedPeriod.endDate, locale],
+		queryFn: () => getWebAnalyticData(timeType, displayedPeriod, locale, t("sys.analysis.metrics.pageViews")),
 		staleTime: 60_000,
 		retry: 1,
 	});
@@ -339,14 +444,31 @@ export default function Analysis() {
 			},
 		},
 		tooltip: {
-			y: {
-				formatter: (value) => `${Math.round(value).toLocaleString()} views`,
+			custom: ({ series, dataPointIndex }) => {
+				const views = Number(series[0]?.[dataPointIndex] ?? 0).toLocaleString();
+				const avgTime = webAnalytic?.chart.avgTimes[dataPointIndex] ?? "0s";
+				const category = webAnalytic?.chart.categories[dataPointIndex] ?? "";
+				return `
+					<div class="apexcharts-tooltip-title">${category}</div>
+					<div class="apexcharts-tooltip-series-group apexcharts-active" style="display: flex;">
+						<div class="apexcharts-tooltip-text">
+							<div class="apexcharts-tooltip-y-group">
+								<span class="apexcharts-tooltip-text-y-label">${t("sys.analysis.metrics.pageViews")}: </span>
+								<span class="apexcharts-tooltip-text-y-value">${views}</span>
+							</div>
+							<div class="apexcharts-tooltip-y-group">
+								<span class="apexcharts-tooltip-text-y-label">${t("sys.analysis.metrics.avgTimeOnPage")}: </span>
+								<span class="apexcharts-tooltip-text-y-value">${avgTime}</span>
+							</div>
+						</div>
+					</div>
+				`;
 			},
 		},
 	});
 
 	const deviceChartOptions = useChart({
-		labels: sessionDevices.map((d) => d.label),
+		labels: sessionDevices.map((d) => t(d.labelKey)),
 		stroke: {
 			show: false,
 		},
@@ -371,17 +493,24 @@ export default function Analysis() {
 			<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-none shadow-none">
 				<div>
 					<Title as="h4" className="text-xl mb-1">
-						Analysis overview
+						{t("sys.analysis.title")}
 					</Title>
 					<Text variant="body2" className="text-muted-foreground">
-						Explore the metrics to understand trends and drive.
+						{t("sys.analysis.subtitle")}
 					</Text>
 				</div>
 				<div className="flex items-center gap-2">
 					<Text variant="body2" className="text-muted-foreground">
-						Show by:
+						{t("sys.analysis.showBy")}
 					</Text>
-					<Select value={timeType} onValueChange={(v) => setTimeType(v as any)}>
+					<Select
+						value={timeType}
+						onValueChange={(value) => {
+							if (value !== "day" && value !== "month") return;
+							setTimeType(value);
+							setPeriodOffset(0);
+						}}
+					>
 						<SelectTrigger className="w-32 h-9">
 							<SelectValue />
 						</SelectTrigger>
@@ -402,20 +531,46 @@ export default function Analysis() {
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle>
 							<Title as="h3" className="text-lg">
-								Web analytic
+								{t("sys.analysis.webAnalytic")}
 							</Title>
 						</CardTitle>
-						{webAnalyticFetching && !webAnalyticLoading ? (
-							<CardAction>
+						<CardAction className="flex items-center gap-2">
+							{webAnalyticFetching && !webAnalyticLoading ? (
 								<Icon icon="mdi:loading" className="animate-spin text-muted-foreground" size={18} />
-							</CardAction>
-						) : null}
+							) : null}
+							<Button size="sm" variant="outline" onClick={() => setPeriodOffset(0)}>
+								{t("sys.analysis.today")}
+							</Button>
+						</CardAction>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2">
+						<div className="flex items-center justify-between gap-2 mb-3">
+							<Button
+								variant="outline"
+								size="icon"
+								aria-label={timeType === "day" ? t("sys.analysis.previousWeek") : t("sys.analysis.previousMonth")}
+								title={timeType === "day" ? t("sys.analysis.previousWeek") : t("sys.analysis.previousMonth")}
+								onClick={() => setPeriodOffset((offset) => offset - 1)}
+							>
+								<Icon icon="mdi:chevron-left" size={20} />
+							</Button>
+							<span className="text-sm font-medium text-center" aria-live="polite">
+								{formatPeriodLabel(timeType, displayedPeriod, locale)}
+							</span>
+							<Button
+								variant="outline"
+								size="icon"
+								aria-label={timeType === "day" ? t("sys.analysis.nextWeek") : t("sys.analysis.nextMonth")}
+								title={timeType === "day" ? t("sys.analysis.nextWeek") : t("sys.analysis.nextMonth")}
+								onClick={() => setPeriodOffset((offset) => offset + 1)}
+							>
+								<Icon icon="mdi:chevron-right" size={20} />
+							</Button>
+						</div>
 						<div className="flex flex-wrap gap-6 items-center">
 							<div>
 								<Text variant="subTitle2" className="text-muted-foreground">
-									Page views
+									{t("sys.analysis.metrics.pageViews")}
 								</Text>
 								{webAnalyticLoading ? (
 									<Skeleton className="mt-1 h-8 w-32" />
@@ -430,7 +585,7 @@ export default function Analysis() {
 							</div>
 							<div>
 								<Text variant="subTitle2" className="text-muted-foreground">
-									Avg. Time on page
+									{t("sys.analysis.metrics.avgTimeOnPage")}
 								</Text>
 								{webAnalyticLoading ? (
 									<Skeleton className="mt-1 h-8 w-32" />
@@ -450,10 +605,10 @@ export default function Analysis() {
 								<div className="flex min-h-[300px] flex-col items-center justify-center gap-3 text-center">
 									<Icon icon="mdi:chart-line-variant" size={36} className="text-muted-foreground" />
 									<Text variant="body2" className="text-muted-foreground">
-										Unable to load analytics data.
+										{t("sys.analysis.loadFailed")}
 									</Text>
 									<Button size="sm" variant="outline" onClick={() => refetchWebAnalytic()}>
-										Try again
+										{t("sys.analysis.tryAgain")}
 									</Button>
 								</div>
 							) : null}
@@ -470,7 +625,7 @@ export default function Analysis() {
 						<Card className="flex-1">
 							<CardHeader className="flex flex-row items-center justify-between pb-2">
 								<CardTitle>
-									<Text variant="subTitle2">Visitor</Text>
+									<Text variant="subTitle2">{t("sys.analysis.metrics.visitor")}</Text>
 								</CardTitle>
 								<CardAction className="rounded-full bg-orange-200 p-2 w-10 h-10 flex items-center justify-center">
 									<Icon icon="mdi:users" size={20} color="black" />
@@ -483,7 +638,7 @@ export default function Analysis() {
 								<div className="flex flex-row gap-2 items-center">
 									<Trend value={visitor.change} />
 									<Text variant="caption" className="text-muted-foreground flex items-center">
-										{visitor.tip}
+										{t(visitor.tipKey)}
 									</Text>
 								</div>
 							</CardContent>
@@ -491,7 +646,7 @@ export default function Analysis() {
 						<Card className="flex-1">
 							<CardHeader className="flex flex-row items-center justify-between pb-2">
 								<CardTitle>
-									<Text variant="subTitle2">Conversion rate</Text>
+									<Text variant="subTitle2">{t("sys.analysis.metrics.conversionRate")}</Text>
 								</CardTitle>
 								<CardAction className="rounded-full bg-emerald-200 p-2 w-10 h-10 flex items-center justify-center">
 									<Icon icon="ph:seal-percent-fill" size={20} color="black" />
@@ -504,7 +659,7 @@ export default function Analysis() {
 								<div className="flex flex-row gap-2 items-center">
 									<Trend value={conversionRate.change} />
 									<Text variant="caption" className="text-muted-foreground flex items-center">
-										{conversionRate.tip}
+										{t(conversionRate.tipKey)}
 									</Text>
 								</div>
 							</CardContent>
@@ -512,7 +667,7 @@ export default function Analysis() {
 						<Card className="flex-1">
 							<CardHeader className="flex flex-row items-center justify-between pb-2">
 								<CardTitle>
-									<Text variant="subTitle2">Ad campaign clicks</Text>
+									<Text variant="subTitle2">{t("sys.analysis.metrics.adCampaignClicks")}</Text>
 								</CardTitle>
 								<CardAction className="rounded-full bg-purple-200 p-2 w-10 h-10 flex items-center justify-center">
 									<Icon icon="heroicons-solid:cursor-click" size={20} color="black" />
@@ -525,7 +680,7 @@ export default function Analysis() {
 								<div className="flex flex-row gap-2 items-center">
 									<Trend value={adCampaign.change} />
 									<Text variant="caption" className="text-muted-foreground flex items-center">
-										{adCampaign.tip}
+										{t(adCampaign.tipKey)}
 									</Text>
 								</div>
 							</CardContent>
@@ -540,13 +695,13 @@ export default function Analysis() {
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle>
 							<Title as="h3" className="text-lg">
-								Top pages
+								{t("sys.analysis.topPages")}
 							</Title>
 						</CardTitle>
 						<CardAction>
 							<Button size="sm" variant="outline">
 								<Icon icon="mdi:download" className="mr-1" />
-								Export data
+								{t("sys.analysis.exportData")}
 							</Button>
 						</CardAction>
 					</CardHeader>
@@ -555,9 +710,9 @@ export default function Analysis() {
 							<table className="w-full text-sm">
 								<thead>
 									<tr>
-										<th className="text-left py-1">PAGE URL</th>
-										<th className="text-right py-1">VIEWS</th>
-										<th className="text-right py-1">UNIQUE VISITORS</th>
+										<th className="text-left py-1">{t("sys.analysis.table.pageUrl")}</th>
+										<th className="text-right py-1">{t("sys.analysis.table.views")}</th>
+										<th className="text-right py-1">{t("sys.analysis.table.uniqueVisitors")}</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -587,7 +742,7 @@ export default function Analysis() {
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle>
 							<Title as="h3" className="text-lg">
-								Session devices
+								{t("sys.analysis.sessionDevices")}
 							</Title>
 						</CardTitle>
 					</CardHeader>
@@ -603,9 +758,9 @@ export default function Analysis() {
 							</div>
 							<div className="flex justify-center gap-4 mt-2">
 								{sessionDevices.map((d) => (
-									<div key={d.label} className="flex flex-col items-center gap-1">
+									<div key={d.labelKey} className="flex flex-col items-center gap-1">
 										<Icon icon={d.icon} size={20} color={d.color} />
-										<Text variant="body2">{d.label}</Text>
+										<Text variant="body2">{t(d.labelKey)}</Text>
 										<Text variant="body2" className="font-bold">
 											{d.value}%
 										</Text>
@@ -621,13 +776,13 @@ export default function Analysis() {
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle>
 							<Title as="h3" className="text-lg">
-								Top channel
+								{t("sys.analysis.topChannel")}
 							</Title>
 						</CardTitle>
 						<CardAction>
 							<Button size="sm" variant="outline">
 								<Icon icon="mdi:download" className="mr-1" />
-								Export data
+								{t("sys.analysis.exportData")}
 							</Button>
 						</CardAction>
 					</CardHeader>
@@ -639,16 +794,16 @@ export default function Analysis() {
 							<div className="flex items-center gap-2">
 								<Trend value={2.6} />
 								<Text variant="caption" className="text-muted-foreground">
-									vs last month
+									{t("sys.analysis.comparison.lastMonth")}
 								</Text>
 							</div>
 						</div>
 						<table className="w-full text-sm">
 							<thead>
 								<tr>
-									<th className="text-left py-1">CHANNEL</th>
-									<th className="text-right py-1">PERCENTAGE</th>
-									<th className="text-right py-1">TOTAL</th>
+									<th className="text-left py-1">{t("sys.analysis.table.channel")}</th>
+									<th className="text-right py-1">{t("sys.analysis.table.percentage")}</th>
+									<th className="text-right py-1">{t("sys.analysis.table.total")}</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -672,13 +827,13 @@ export default function Analysis() {
 					<CardHeader className="flex flex-row items-center justify-between pb-2">
 						<CardTitle>
 							<Title as="h3" className="text-lg">
-								Traffic data
+								{t("sys.analysis.trafficData")}
 							</Title>
 						</CardTitle>
 						<CardAction>
 							<Button size="sm" variant="outline">
 								<Icon icon="mdi:download" className="mr-1" />
-								Export data
+								{t("sys.analysis.exportData")}
 							</Button>
 						</CardAction>
 					</CardHeader>
@@ -687,18 +842,18 @@ export default function Analysis() {
 							<table className="w-full text-sm">
 								<thead>
 									<tr>
-										<th className="text-left p-2">SOURCE</th>
-										<th className="text-right p-2">VISITS</th>
-										<th className="text-right p-2">UNIQUE VISITORS</th>
-										<th className="text-right p-2">BOUNCE RATE</th>
-										<th className="text-right p-2">AVG. SESSION DURATION</th>
-										<th className="text-left p-2">PROGRESS TO GOAL (%)</th>
+										<th className="text-left p-2">{t("sys.analysis.table.source")}</th>
+										<th className="text-right p-2">{t("sys.analysis.table.visits")}</th>
+										<th className="text-right p-2">{t("sys.analysis.table.uniqueVisitors")}</th>
+										<th className="text-right p-2">{t("sys.analysis.table.bounceRate")}</th>
+										<th className="text-right p-2">{t("sys.analysis.table.avgSessionDuration")}</th>
+										<th className="text-left p-2">{t("sys.analysis.table.progressToGoal")}</th>
 									</tr>
 								</thead>
 								<tbody>
 									{trafficData.map((row) => (
-										<tr key={row.source} className="border-t">
-											<td className="p-2 font-mono">{row.source}</td>
+										<tr key={row.sourceKey} className="border-t">
+											<td className="p-2 font-mono">{t(row.sourceKey)}</td>
 											<td className="p-2 text-right">{row.visits.toLocaleString()}</td>
 											<td className="p-2 text-right">{row.unique.toLocaleString()}</td>
 											<td className="p-2 text-right">

@@ -292,6 +292,69 @@
 			"fullscreen": "全屏",
 			"refresh": "刷新"
 		},
+		"analysis": {
+			"title": "分析概览",
+			"subtitle": "查看关键指标，了解趋势并辅助决策。",
+			"showBy": "显示维度：",
+			"time": {
+				"week": "周",
+				"month": "月"
+			},
+			"webAnalytic": "网站分析",
+			"today": "今天",
+			"previousWeek": "上一周",
+			"previousMonth": "上个月",
+			"nextWeek": "下一周",
+			"nextMonth": "下个月",
+			"loadFailed": "无法加载分析数据。",
+			"tryAgain": "重试",
+			"exportData": "导出数据",
+			"topPages": "热门页面",
+			"sessionDevices": "会话设备",
+			"topChannel": "热门渠道",
+			"trafficData": "流量数据",
+			"metrics": {
+				"pageViews": "页面浏览量",
+				"avgTimeOnPage": "平均页面停留时间",
+				"visitor": "访客数",
+				"conversionRate": "转化率",
+				"adCampaignClicks": "广告活动点击量"
+			},
+			"comparison": {
+				"lastDay": "较前一天",
+				"lastWeek": "较上一周",
+				"lastMonth": "较上个月",
+				"lastYear": "较上一年"
+			},
+			"devices": {
+				"desktop": "桌面端",
+				"mobile": "移动端",
+				"tablet": "平板"
+			},
+			"sources": {
+				"direct": "直接访问",
+				"natural": "自然流量",
+				"referral": "推荐流量",
+				"socialMedia": "社交媒体",
+				"emailCampaign": "邮件活动"
+			},
+			"chart": {
+				"viewsTooltip": "{{value}} 次浏览"
+			},
+			"table": {
+				"pageUrl": "页面 URL",
+				"views": "浏览量",
+				"uniqueVisitors": "独立访客",
+				"channel": "渠道",
+				"percentage": "占比",
+				"total": "总计",
+				"source": "来源",
+				"visits": "访问量",
+				"bounceRate": "跳出率",
+				"avgSessionDuration": "平均会话时长",
+				"progressToGoal": "目标进度 (%)"
+			}
+		},
 		"record": {
 			"title": "工作记录",
 			"subtitle": "日历工作台",
@@ -441,8 +504,3 @@
 		}
 	}
 }
-
-
-
-
-
