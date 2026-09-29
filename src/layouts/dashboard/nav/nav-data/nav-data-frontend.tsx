@@ -7,6 +7,11 @@ export const frontendNavData: NavProps["data"] = [
 		name: "sys.nav.dashboard",
 		items: [
 			{
+				title: "sys.nav.homeDigitalTwin",
+				path: "/home-digital-twin",
+				icon: <Icon icon="solar:home-2-bold-duotone" size="24" />,
+			},
+			{
 				title: "sys.nav.workbench",
 				path: "/workbench",
 				icon: <Icon icon="local:ic-workbench" size="24" />,

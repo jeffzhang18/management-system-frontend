@@ -135,6 +135,7 @@
 				"index": "User",
 				"profile": "Profile"
 			},
+			"homeDigitalTwin": "Home Digital Twin",
 			"workbench": "Workbench"
 		},
 		"settings": {
