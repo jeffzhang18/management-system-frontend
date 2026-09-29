@@ -1,45 +1,45 @@
 import apiClient from "@/api/apiClient";
 
-export type AnalysisPeriodQuery =
-	| { date: string; startDate?: never; endDate?: never }
-	| { date?: never; startDate: string; endDate: string };
+export type PageViewsQuery = {
+	startDate: string;
+	endDate: string;
+};
 
-export interface AnalysisPeriod {
-	startAt: string;
-	endAt: string;
-	timezone: "Asia/Shanghai";
-}
-
-export interface TotalPageViewsResponse extends AnalysisPeriod {
-	totalPageViews: number;
-}
-
-export interface AverageTimeOnPageResponse extends AnalysisPeriod {
+export interface DailyPageViews {
+	date: string;
 	pageViews: number;
+	totalTimeOnPageMs: number;
 	averageTimeOnPageMs: number;
-	averageTimeOnPageSeconds: number;
+}
+
+export interface PageViewsSummary {
+	totalPageViews: number;
+	averageDailyPageViews: number;
+	totalTimeOnPageMs: number;
+	averageTimeOnPageMs: number;
+}
+
+export interface PageViewsResponse {
+	daily: DailyPageViews[];
+	summary: PageViewsSummary;
+	period: {
+		startDate: string;
+		endDate: string;
+		timezone: "Asia/Shanghai";
+	};
 }
 
 const AnalysisApi = {
-	TotalPageViews: "/analysis/total-page-views",
-	AverageTimeOnPage: "/analysis/average-time-on-page",
+	PageViews: "/analysis/page-views",
 } as const;
 
-const getTotalPageViews = (params: AnalysisPeriodQuery, suppressErrorToast = false) =>
-	apiClient.get<TotalPageViewsResponse>({
-		url: AnalysisApi.TotalPageViews,
-		params,
-		suppressErrorToast,
-	});
-
-const getAverageTimeOnPage = (params: AnalysisPeriodQuery, suppressErrorToast = false) =>
-	apiClient.get<AverageTimeOnPageResponse>({
-		url: AnalysisApi.AverageTimeOnPage,
+const getPageViews = (params: PageViewsQuery, suppressErrorToast = false) =>
+	apiClient.get<PageViewsResponse>({
+		url: AnalysisApi.PageViews,
 		params,
 		suppressErrorToast,
 	});
 
 export default {
-	getTotalPageViews,
-	getAverageTimeOnPage,
+	getPageViews,
 };

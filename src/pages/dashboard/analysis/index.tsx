@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import analysisService, { type AnalysisPeriodQuery } from "@/api/services/analysisService";
+import analysisService, { type PageViewsQuery } from "@/api/services/analysisService";
 import { Chart } from "@/components/chart/chart";
 import { useChart } from "@/components/chart/useChart";
 import Icon from "@/components/icon/icon";
@@ -23,7 +23,7 @@ type TimeType = "day" | "week" | "month";
 
 type AnalysisBucket = {
 	label: string;
-	query: AnalysisPeriodQuery;
+	query: PageViewsQuery;
 };
 
 type WebAnalyticData = {
@@ -80,15 +80,15 @@ const buildAnalysisBuckets = (timeType: TimeType): AnalysisBucket[] => {
 	const today = getChinaToday();
 
 	if (timeType === "day") {
-		return Array.from({ length: 12 }, (_, index) => {
-			const date = addDays(today, index - 11);
-			return { label: formatDateLabel(date), query: { date } };
+		return Array.from({ length: 7 }, (_, index) => {
+			const date = addDays(today, index - 6);
+			return { label: formatDateLabel(date), query: { startDate: date, endDate: date } };
 		});
 	}
 
 	if (timeType === "week") {
-		return Array.from({ length: 12 }, (_, index) => {
-			const endDate = addDays(today, (index - 11) * 7);
+		return Array.from({ length: 8 }, (_, index) => {
+			const endDate = addDays(today, (index - 7) * 7);
 			const startDate = addDays(endDate, -6);
 			return { label: formatDateLabel(endDate), query: { startDate, endDate } };
 		});
@@ -102,13 +102,7 @@ const buildAnalysisBuckets = (timeType: TimeType): AnalysisBucket[] => {
 	});
 };
 
-const getQueryDateRange = (query: AnalysisPeriodQuery): { startDate: string; endDate: string } => {
-	if (query.date) return { startDate: query.date, endDate: query.date };
-	if (query.startDate && query.endDate) return { startDate: query.startDate, endDate: query.endDate };
-	throw new Error("Analytics date range is unavailable");
-};
-
-const getPreviousPeriodQuery = (startDate: string, endDate: string): AnalysisPeriodQuery => {
+const getPreviousPeriodQuery = (startDate: string, endDate: string): PageViewsQuery => {
 	const periodLength =
 		Math.round((parseDateKey(endDate).getTime() - parseDateKey(startDate).getTime()) / 86_400_000) + 1;
 	const previousEndDate = addDays(startDate, -1);
@@ -156,30 +150,35 @@ const getWebAnalyticData = async (timeType: TimeType): Promise<WebAnalyticData> 
 
 	if (!firstBucket || !currentBucket) throw new Error("Analytics periods are unavailable");
 
-	const firstRange = getQueryDateRange(firstBucket.query);
-	const currentRange = getQueryDateRange(currentBucket.query);
-	const displayedPeriodQuery: AnalysisPeriodQuery = {
-		startDate: firstRange.startDate,
-		endDate: currentRange.endDate,
+	const displayedPeriodQuery: PageViewsQuery = {
+		startDate: firstBucket.query.startDate,
+		endDate: currentBucket.query.endDate,
 	};
-	const previousPeriodQuery = getPreviousPeriodQuery(firstRange.startDate, currentRange.endDate);
+	const previousPeriodQuery = getPreviousPeriodQuery(displayedPeriodQuery.startDate, displayedPeriodQuery.endDate);
 
-	const [pageViewResults, previousPageViews, currentAverage, previousAverage] = await Promise.all([
-		Promise.all(buckets.map((bucket) => analysisService.getTotalPageViews(bucket.query, true))),
-		analysisService.getTotalPageViews(previousPeriodQuery, true),
-		analysisService.getAverageTimeOnPage(displayedPeriodQuery, true),
-		analysisService.getAverageTimeOnPage(previousPeriodQuery, true),
+	const [current, previous] = await Promise.all([
+		analysisService.getPageViews(displayedPeriodQuery, true),
+		analysisService.getPageViews(previousPeriodQuery, true),
 	]);
-
-	const pageViews = pageViewResults.reduce((total, result) => total + (result.totalPageViews || 0), 0);
+	const pageViewsByDate = new Map(current.daily.map((item) => [item.date, item.pageViews]));
+	const chartData = buckets.map((bucket) => {
+		let total = 0;
+		for (let date = bucket.query.startDate; date <= bucket.query.endDate; date = addDays(date, 1)) {
+			total += pageViewsByDate.get(date) ?? 0;
+		}
+		return total;
+	});
 
 	return {
-		pageViews,
-		pageViewsChange: getPercentChange(pageViews, previousPageViews.totalPageViews || 0),
-		avgTime: formatDuration(currentAverage.averageTimeOnPageMs || 0),
-		avgTimeChange: getPercentChange(currentAverage.averageTimeOnPageMs || 0, previousAverage.averageTimeOnPageMs || 0),
+		pageViews: current.summary.totalPageViews || 0,
+		pageViewsChange: getPercentChange(current.summary.totalPageViews || 0, previous.summary.totalPageViews || 0),
+		avgTime: formatDuration(current.summary.averageTimeOnPageMs || 0),
+		avgTimeChange: getPercentChange(
+			current.summary.averageTimeOnPageMs || 0,
+			previous.summary.averageTimeOnPageMs || 0,
+		),
 		chart: {
-			series: [{ name: "Page views", data: pageViewResults.map((result) => result.totalPageViews || 0) }],
+			series: [{ name: "Page views", data: chartData }],
 			categories: buckets.map((bucket) => bucket.label),
 		},
 	};
