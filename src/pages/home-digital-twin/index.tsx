@@ -37,6 +37,8 @@ import {
 	planSchema,
 } from "./model";
 import "./style.css";
+import { formatHour, type SunConfig, sunriseSunset } from "./sun";
+
 const Scene = lazy(() => import("./scene"));
 const KEY = "home-digital-twin-v1";
 const icons = {
@@ -61,6 +63,12 @@ export default function HomeDigitalTwin() {
 	const [tool, setTool] = useState("select");
 	const [view, setView] = useState("split");
 	const [low, setLow] = useState(false);
+	const [time, setTime] = useState(12);
+	const [lat, setLat] = useState(31.23);
+	const [lon, setLon] = useState(121.47);
+	const [tz, setTz] = useState(8);
+	const [date, setDate] = useState("2026-09-29");
+	const [showSunSettings, setShowSunSettings] = useState(false);
 	const [saved, setSaved] = useState(true);
 	const [busy, setBusy] = useState<string | null>(null);
 	const history = useRef<Plan[]>([]),
@@ -68,6 +76,11 @@ export default function HomeDigitalTwin() {
 		input = useRef<HTMLInputElement>(null);
 	const current = useRef(plan);
 	current.current = plan;
+	const [sunYear, sunMonth, sunDay] = date.split("-").map(Number);
+	const sunCfg: SunConfig = { lat, lon, tzOffset: tz, year: sunYear || 2026, month: sunMonth || 9, day: sunDay || 29 };
+	const dayRange = sunriseSunset(sunCfg);
+	const minTime = dayRange ? dayRange.sunrise : 6;
+	const maxTime = dayRange ? dayRange.sunset : 18;
 	function change(p: Plan, record = true) {
 		if (record) history.current.push(current.current);
 		if (history.current.length > 100) history.current.shift();
@@ -188,7 +201,7 @@ export default function HomeDigitalTwin() {
 								<button
 									type="button"
 									key={key as string}
-									title={label as string}
+									title={key === "select" ? "选择：点击选中，拖动平移平面图（Esc 返回）" : (label as string)}
 									className={tool === key ? "active" : ""}
 									onClick={() => setTool(key as string)}
 								>
@@ -277,20 +290,74 @@ export default function HomeDigitalTwin() {
 								<div className="twin-view-label">
 									平面图 <span>20 × 20 m</span>
 								</div>
-								<Editor key={tool} plan={plan} change={change} selected={selected} select={select} tool={tool} />
+								<Editor
+									plan={plan}
+									change={change}
+									selected={selected}
+									select={select}
+									tool={tool}
+									resetTool={() => setTool("select")}
+								/>
 							</section>
 						)}
 						{view !== "2d" && (
 							<section className="twin-viewport">
-								<div className="twin-view-label">
-									空间预览{" "}
-									<label>
-										<input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} />
-										低墙
-									</label>
+								<div className="twin-view-label twin-view-label-col">
+									<span className="twin-view-title">空间预览</span>
+									<span className="twin-sun-wrap">
+										<label className="twin-sun">
+											<input
+												type="range"
+												min={minTime}
+												max={maxTime}
+												step="0.25"
+												value={Math.min(maxTime, Math.max(minTime, time))}
+												onChange={(e) => setTime(Number(e.target.value))}
+												aria-label="一天中的时间"
+											/>
+											<b>{formatHour(Math.min(maxTime, Math.max(minTime, time)))}</b>
+										</label>
+										<label className="twin-lowwall">
+											<input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} />
+											低墙
+										</label>
+										<button
+											type="button"
+											className="twin-sun-settings-btn"
+											onClick={() => setShowSunSettings((v) => !v)}
+											title="位置与太阳设置"
+										>
+											{showSunSettings ? "收起" : "位置与太阳"}
+										</button>
+									</span>
+									{showSunSettings && (
+										<div className="twin-sun-settings">
+											<label>
+												纬度
+												<input type="number" step="0.01" value={lat} onChange={(e) => setLat(Number(e.target.value))} />
+											</label>
+											<label>
+												经度
+												<input type="number" step="0.01" value={lon} onChange={(e) => setLon(Number(e.target.value))} />
+											</label>
+											<label>
+												时区 (UTC±)
+												<input type="number" step="1" value={tz} onChange={(e) => setTz(Number(e.target.value))} />
+											</label>
+											<label>
+												日期
+												<input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+											</label>
+											<span className="twin-sun-times">
+												{dayRange
+													? `日出 ${formatHour(dayRange.sunrise)} · 日落 ${formatHour(dayRange.sunset)}`
+													: "当日极昼或极夜，无日出日落"}
+											</span>
+										</div>
+									)}
 								</div>
 								<Suspense fallback={<div className="twin-empty">场景加载中…</div>}>
-									<Scene plan={plan} selected={selected} select={select} top={low} />
+									<Scene plan={plan} selected={selected} select={select} top={low} time={time} sunCfg={sunCfg} />
 								</Suspense>
 							</section>
 						)}

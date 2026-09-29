@@ -1,5 +1,5 @@
-import { Hand, Scan, ZoomIn, ZoomOut } from "lucide-react";
-import { type PointerEvent, useRef, useState } from "react";
+import { Scan, Section, ZoomIn, ZoomOut } from "lucide-react";
+import { type PointerEvent, useEffect, useRef, useState } from "react";
 import { id, type Kind, labels, length, newItem, type Plan, type Point } from "./model";
 
 export default function Editor({
@@ -8,17 +8,20 @@ export default function Editor({
 	selected,
 	select,
 	tool,
+	resetTool,
 }: {
 	plan: Plan;
 	change: (p: Plan, record?: boolean) => void;
 	selected: string | null;
 	select: (s: string | null) => void;
 	tool: string;
+	resetTool: () => void;
 }) {
 	const svg = useRef<SVGSVGElement>(null);
 	const [frame, setFrame] = useState({ x: 0, y: 0, size: 1000 });
-	const [panMode, setPanMode] = useState(false);
-	const pan = useRef<{ x: number; y: number; frame: typeof frame } | null>(null);
+	const [ortho, setOrtho] = useState(false);
+	const [shift, setShift] = useState(false);
+	const pan = useRef<{ x: number; y: number; frame: typeof frame; button: number; moved: boolean } | null>(null);
 	const zoom = (factor: number) =>
 		setFrame((f) => {
 			const size = Math.max(250, Math.min(1500, f.size * factor));
@@ -27,6 +30,46 @@ export default function Editor({
 	const [start, setStart] = useState<Point | null>(null);
 	const [cursor, setCursor] = useState<Point | null>(null);
 	const drag = useRef<{ id: string; end?: "a" | "b"; plan: Plan; moved?: boolean } | null>(null);
+	const resetToolRef = useRef(resetTool);
+	resetToolRef.current = resetTool;
+	useEffect(() => {
+		const down = (e: KeyboardEvent) => {
+			if (e.key === "Shift") setShift(true);
+		};
+		const up = (e: KeyboardEvent) => {
+			if (e.key === "Shift") setShift(false);
+		};
+		const blur = () => setShift(false);
+		window.addEventListener("keydown", down);
+		window.addEventListener("keyup", up);
+		window.addEventListener("blur", blur);
+		return () => {
+			window.removeEventListener("keydown", down);
+			window.removeEventListener("keyup", up);
+			window.removeEventListener("blur", blur);
+		};
+	}, []);
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				const active = document.activeElement;
+				if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) {
+					active.blur();
+					return;
+				}
+				setStart(null);
+				pan.current = null;
+				resetToolRef.current();
+			}
+		};
+		window.addEventListener("keydown", onKey);
+		return () => window.removeEventListener("keydown", onKey);
+	}, []);
+	const lastTool = useRef(tool);
+	if (lastTool.current !== tool) {
+		lastTool.current = tool;
+		if (start) setStart(null);
+	}
 	const point = (x: number, y: number): Point => {
 		const matrix = svg.current?.getScreenCTM();
 		if (!matrix) return { x: 0, y: 0 };
@@ -36,12 +79,17 @@ export default function Editor({
 			y: Math.max(0, Math.min(20, Math.round(p.y / 5) * 0.1)),
 		};
 		const endpoint = plan.walls.flatMap((w) => [w.a, w.b]).find((p) => Math.hypot(p.x - raw.x, p.y - raw.y) < 0.18);
-		return endpoint ?? raw;
+		const snapped = endpoint ?? raw;
+		if (!start || !(ortho || shift)) return snapped;
+		const dx = snapped.x - start.x;
+		const dy = snapped.y - start.y;
+		return Math.abs(dx) >= Math.abs(dy) ? { ...snapped, y: start.y } : { ...snapped, x: start.x };
 	};
 	const down = (e: PointerEvent<SVGSVGElement>) => {
-		if (panMode || e.button === 1) {
+		const selectTool = tool === "select";
+		if (e.button === 1 || (selectTool && e.button === 0)) {
 			e.preventDefault();
-			pan.current = { x: e.clientX, y: e.clientY, frame };
+			pan.current = { x: e.clientX, y: e.clientY, frame, button: e.button, moved: false };
 			svg.current?.setPointerCapture(e.pointerId);
 			return;
 		}
@@ -61,19 +109,22 @@ export default function Editor({
 	return (
 		<>
 			<div className="twin-canvas-tools">
+				{tool === "wall" && (
+					<button
+						type="button"
+						title="正交模式：墙体保持水平或垂直，按住 Shift 可临时开启"
+						className={ortho ? "active" : ""}
+						onClick={() => setOrtho(!ortho)}
+					>
+						<Section size={16} />
+						<span>正交</span>
+					</button>
+				)}
 				<button type="button" title="放大平面图" onClick={() => zoom(0.8)}>
 					<ZoomIn size={16} />
 				</button>
 				<button type="button" title="缩小平面图" onClick={() => zoom(1.25)}>
 					<ZoomOut size={16} />
-				</button>
-				<button
-					type="button"
-					title="平移平面图"
-					className={panMode ? "active" : ""}
-					onClick={() => setPanMode(!panMode)}
-				>
-					<Hand size={16} />
 				</button>
 				<button type="button" title="重置平面视图" onClick={() => setFrame({ x: 0, y: 0, size: 1000 })}>
 					<Scan size={16} />
@@ -82,15 +133,15 @@ export default function Editor({
 			<svg
 				ref={svg}
 				className="twin-plan"
+				style={{ cursor: "crosshair" }}
 				viewBox={`${frame.x} ${frame.y} ${frame.size} ${frame.size}`}
 				aria-label="户型平面编辑器"
-				onKeyDown={(e) => {
-					if (e.key === "Escape") setStart(null);
-				}}
 				onPointerDown={down}
 				onPointerMove={(e) => {
 					if (pan.current) {
 						const d = pan.current;
+						if (!d.moved && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 4) return;
+						d.moved = true;
 						const scale = svg.current?.getScreenCTM()?.a;
 						if (!scale) return;
 						setFrame({
@@ -115,6 +166,8 @@ export default function Editor({
 					}
 				}}
 				onPointerUp={() => {
+					const d = pan.current;
+					if (d && !d.moved && d.button === 0 && tool === "select") select(null);
 					pan.current = null;
 					drag.current = null;
 				}}
@@ -157,7 +210,7 @@ export default function Editor({
 							strokeWidth={w.thickness * 50}
 							strokeLinecap="square"
 							onPointerDown={(e) => {
-								if (tool === "wall" || panMode) return;
+								if (!["select", "door", "window"].includes(tool)) return;
 								e.stopPropagation();
 								if (tool === "door" || tool === "window") {
 									const p = point(e.clientX, e.clientY);
@@ -234,13 +287,12 @@ export default function Editor({
 						key={i.id}
 						transform={`translate(${i.x * 50},${i.y * 50}) rotate(${i.rotation})`}
 						onPointerDown={(e) => {
-							if (tool !== "select" || panMode) return;
+							if (tool !== "select") return;
 							e.stopPropagation();
 							select(i.id);
 							drag.current = { id: i.id, plan };
 							svg.current?.setPointerCapture(e.pointerId);
 						}}
-						style={{ cursor: "grab" }}
 					>
 						<rect
 							x={i.kind === "sofa" ? -52 : i.kind === "bed" ? -40 : -25}

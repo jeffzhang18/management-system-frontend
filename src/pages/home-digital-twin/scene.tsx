@@ -1,8 +1,54 @@
 import { Grid, Html, OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { Component, type ReactNode } from "react";
+import { Component, type ReactNode, useEffect, useRef } from "react";
+import type * as THREE from "three";
 import { type Item, isDevice, length, type Plan } from "./model";
+import { type SunConfig, type SunPosition, sunPosition } from "./sun";
 
+const SUN_RADIUS = 46;
+const CENTER: [number, number, number] = [10, 0, 10];
+function SunLight({ sun }: { sun: SunPosition }) {
+	const ref = useRef<THREE.DirectionalLight>(null);
+	useEffect(() => {
+		if (ref.current) {
+			ref.current.target.position.set(CENTER[0], CENTER[1], CENTER[2]);
+			ref.current.target.updateMatrixWorld();
+		}
+	}, []);
+	const azimuth = (sun.azimuth * Math.PI) / 180;
+	const elevation = (sun.elevation * Math.PI) / 180;
+	// 方位角 0=北(-z)，90=东(+x)；高度角转成光的方向
+	const dir: [number, number, number] = [
+		Math.sin(azimuth) * Math.cos(elevation),
+		Math.sin(elevation),
+		-Math.cos(azimuth) * Math.cos(elevation),
+	];
+	const position: [number, number, number] = [
+		CENTER[0] + dir[0] * SUN_RADIUS,
+		CENTER[1] + dir[1] * SUN_RADIUS,
+		CENTER[2] + dir[2] * SUN_RADIUS,
+	];
+	const elev = sun.elevation;
+	const intensity = elev > 0.05 ? Math.min(3, 0.5 + elev * 0.045) : 0.08;
+	const color = elev > 25 ? "#fff1d2" : elev > 5 ? "#ffdfa8" : "#ffd2a0";
+	return (
+		<directionalLight
+			ref={ref}
+			position={position}
+			intensity={intensity}
+			color={color}
+			castShadow
+			shadow-mapSize={[2048, 2048]}
+			shadow-camera-left={-16}
+			shadow-camera-right={16}
+			shadow-camera-top={16}
+			shadow-camera-bottom={-16}
+			shadow-camera-near={1}
+			shadow-camera-far={100}
+			shadow-bias={-0.0004}
+		/>
+	);
+}
 function Box({
 	position,
 	size,
@@ -102,12 +148,17 @@ export default function Scene({
 	selected,
 	select,
 	top,
+	time = 12,
+	sunCfg = { lat: 31.23, lon: 121.47, tzOffset: 8, year: 2026, month: 9, day: 29 },
 }: {
 	plan: Plan;
 	selected: string | null;
 	select: (id: string | null) => void;
 	top: boolean;
+	time?: number;
+	sunCfg?: SunConfig;
 }) {
+	const sun = sunPosition(sunCfg, time);
 	return (
 		<SceneBoundary>
 			<Canvas
@@ -118,7 +169,7 @@ export default function Scene({
 			>
 				<color attach="background" args={["#edf1f1"]} />
 				<ambientLight intensity={1.5} />
-				<directionalLight position={[8, 16, 8]} intensity={2} castShadow shadow-mapSize={[2048, 2048]} />
+				<SunLight sun={sun} />
 				<Grid
 					position={[10, -0.04, 10]}
 					args={[24, 24]}

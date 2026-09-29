@@ -199,6 +199,88 @@
 	align-items: center;
 	gap: 5px;
 }
+.twin-view-label-col {
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 4px;
+}
+.twin-sun-wrap {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.twin-sun {
+	gap: 8px;
+	font-variant-numeric: tabular-nums;
+}
+.twin-sun b {
+	font-size: 11px;
+	font-weight: 600;
+	color: #2f4a3e;
+	min-width: 44px;
+	text-align: right;
+}
+.twin-sun input[type="range"] {
+	width: 130px;
+	margin: 0;
+	accent-color: #d9902f;
+}
+.twin-lowwall {
+	gap: 5px;
+	white-space: nowrap;
+}
+.twin-view-title {
+	align-self: flex-end;
+}
+.twin-sun-settings-btn {
+	pointer-events: auto;
+	min-height: 22px;
+	padding: 2px 8px;
+	font-size: 10px;
+	border-radius: 4px;
+	background: #fff;
+}
+.twin-sun-settings {
+	pointer-events: auto;
+	position: absolute;
+	top: 34px;
+	right: 12px;
+	z-index: 4;
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 8px;
+	padding: 12px;
+	background: #fff;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	box-shadow: 0 8px 24px #0f2a1e14;
+}
+.twin-sun-settings label {
+	pointer-events: auto;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 10px;
+	color: #4c645a;
+	white-space: nowrap;
+}
+.twin-sun-settings input[type="number"],
+.twin-sun-settings input[type="date"] {
+	width: 96px;
+	border: 1px solid var(--line);
+	border-radius: 4px;
+	padding: 4px 6px;
+	font-size: 11px;
+	color: #2f4a3e;
+	background: #fff;
+	margin: 0;
+}
+.twin-sun-times {
+	grid-column: 1 / -1;
+	font-size: 10px;
+	color: #687e73;
+	text-align: right;
+}
 .twin-status {
 	display: flex;
 	justify-content: space-between;
