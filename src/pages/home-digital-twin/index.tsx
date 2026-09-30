@@ -24,6 +24,16 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/ui/badge";
+import { Button } from "@/ui/button";
+import { Card } from "@/ui/card";
+import { Input } from "@/ui/input";
+import { Label } from "@/ui/label";
+import { Separator } from "@/ui/separator";
+import { Slider } from "@/ui/slider";
+import { Switch } from "@/ui/switch";
+import { Tabs, TabsList, TabsTrigger } from "@/ui/tabs";
+import { cn } from "@/utils";
 import Editor from "./editor";
 import {
 	blankPlan,
@@ -128,33 +138,44 @@ export default function HomeDigitalTwin() {
 		select(null);
 	}
 	return (
-		<div className="twin">
+		<div className="twin space-y-4">
 			<header className="twin-header">
 				<div className="twin-heading">
-					<House size={26} />
+					<div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+						<House size={20} />
+					</div>
 					<div>
 						<h1>家庭数字孪生</h1>
-						<input
+						<Input
 							aria-label="模型名称"
 							value={plan.name}
 							maxLength={80}
+							className="mt-1 h-6 w-48 border-0 px-0 text-xs text-muted-foreground shadow-none focus-visible:ring-0"
 							onChange={(e) => change({ ...plan, name: e.target.value || "我的家" })}
 						/>
 					</div>
 				</div>
 				<div className="twin-actions">
 					<span className="twin-save">{saved ? "已保存到本机" : "保存失败"}</span>
-					<button type="button" title="新建空白模型" onClick={() => replace(blankPlan())}>
+					<Button type="button" variant="outline" size="icon" title="新建空白模型" onClick={() => replace(blankPlan())}>
 						<Plus size={17} />
-					</button>
-					<button type="button" onClick={() => replace(demoPlan())}>
+					</Button>
+					<Button type="button" variant="outline" size="sm" onClick={() => replace(demoPlan())}>
 						示例户型
-					</button>
-					<button type="button" title="导入模型 JSON" onClick={() => input.current?.click()}>
-						<Upload size={17} />
-					</button>
-					<button
+					</Button>
+					<Button
 						type="button"
+						variant="outline"
+						size="icon"
+						title="导入模型 JSON"
+						onClick={() => input.current?.click()}
+					>
+						<Upload size={17} />
+					</Button>
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
 						title="导出模型 JSON"
 						onClick={() => {
 							const url = URL.createObjectURL(new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" }));
@@ -166,7 +187,7 @@ export default function HomeDigitalTwin() {
 						}}
 					>
 						<Download size={17} />
-					</button>
+					</Button>
 					<input
 						ref={input}
 						type="file"
@@ -186,37 +207,47 @@ export default function HomeDigitalTwin() {
 					/>
 				</div>
 			</header>
-			<div className="twin-workspace">
+			<Card className="twin-workspace overflow-hidden p-0">
 				<aside className="twin-library">
-					<h2>构建</h2>
-					<div className="twin-tools">
-						{[
-							["select", MousePointer2, "选择"],
-							["wall", PencilRuler, "墙体"],
-							["door", DoorOpen, "门"],
-							["window", PanelsTopLeft, "窗"],
-						].map(([key, Icon, label]) => {
-							const Glyph = Icon as typeof MousePointer2;
-							return (
-								<button
-									type="button"
-									key={key as string}
-									title={key === "select" ? "选择：点击选中，拖动平移平面图（Esc 返回）" : (label as string)}
-									className={tool === key ? "active" : ""}
-									onClick={() => setTool(key as string)}
-								>
-									<Glyph size={19} />
-									<span>{label as string}</span>
-								</button>
-							);
-						})}
-					</div>
-					<h2>家具</h2>
-					<div className="twin-tools">{(["sofa", "bed", "table"] as Kind[]).map(renderTool)}</div>
-					<h2>
-						智能设备 <span className="twin-badge">模拟</span>
-					</h2>
-					<div className="twin-tools">{(["light", "socket", "ac", "sensor"] as Kind[]).map(renderTool)}</div>
+					<section className="twin-tool-group">
+						<h2>构建</h2>
+						<div className="twin-tools">
+							{[
+								["select", MousePointer2, "选择"],
+								["wall", PencilRuler, "墙体"],
+								["door", DoorOpen, "门"],
+								["window", PanelsTopLeft, "窗"],
+							].map(([key, Icon, label]) => {
+								const Glyph = Icon as typeof MousePointer2;
+								return (
+									<Button
+										type="button"
+										key={key as string}
+										title={key === "select" ? "选择：点击选中，拖动平移平面图（Esc 返回）" : (label as string)}
+										variant="outline"
+										className={cn("twin-tool", tool === key && "active")}
+										onClick={() => setTool(key as string)}
+									>
+										<Glyph size={19} />
+										<span>{label as string}</span>
+									</Button>
+								);
+							})}
+						</div>
+					</section>
+					<Separator orientation="vertical" className="twin-library-separator" />
+					<section className="twin-tool-group">
+						<h2>家具</h2>
+						<div className="twin-tools">{(["sofa", "bed", "table"] as Kind[]).map(renderTool)}</div>
+					</section>
+					<Separator orientation="vertical" className="twin-library-separator" />
+					<section className="twin-tool-group">
+						<h2>
+							智能设备 <Badge variant="secondary">模拟</Badge>
+						</h2>
+						<div className="twin-tools">{(["light", "socket", "ac", "sensor"] as Kind[]).map(renderTool)}</div>
+					</section>
+					<Separator orientation="vertical" className="twin-library-separator" />
 					<div className="twin-totals">
 						<span>
 							墙体 <b>{plan.walls.length}</b>
@@ -231,29 +262,28 @@ export default function HomeDigitalTwin() {
 				</aside>
 				<main className="twin-main">
 					<div className="twin-toolbar">
-						<div className="twin-segment">
-							{[
-								["2d", LayoutGrid, "平面"],
-								["split", Columns2, "联动"],
-								["3d", Box, "三维"],
-							].map(([v, I, t]) => {
-								const Icon = I as typeof Box;
-								return (
-									<button
-										type="button"
-										key={v as string}
-										className={view === v ? "active" : ""}
-										onClick={() => setView(v as string)}
-									>
-										<Icon size={16} />
-										{t as string}
-									</button>
-								);
-							})}
-						</div>
+						<Tabs value={view} onValueChange={setView}>
+							<TabsList>
+								{[
+									["2d", LayoutGrid, "平面"],
+									["split", Columns2, "联动"],
+									["3d", Box, "三维"],
+								].map(([v, I, t]) => {
+									const Icon = I as typeof Box;
+									return (
+										<TabsTrigger key={v as string} value={v as string}>
+											<Icon size={16} />
+											{t as string}
+										</TabsTrigger>
+									);
+								})}
+							</TabsList>
+						</Tabs>
 						<div className="twin-actions">
-							<button
+							<Button
 								type="button"
+								variant="ghost"
+								size="icon"
 								title="撤销"
 								disabled={!history.current.length}
 								onClick={() => {
@@ -266,9 +296,11 @@ export default function HomeDigitalTwin() {
 								}}
 							>
 								<Undo2 size={16} />
-							</button>
-							<button
+							</Button>
+							<Button
 								type="button"
+								variant="ghost"
+								size="icon"
 								title="重做"
 								disabled={!future.current.length}
 								onClick={() => {
@@ -281,7 +313,7 @@ export default function HomeDigitalTwin() {
 								}}
 							>
 								<Redo2 size={16} />
-							</button>
+							</Button>
 						</div>
 					</div>
 					<div className={`twin-views ${view === "split" ? "split" : ""}`}>
@@ -305,49 +337,51 @@ export default function HomeDigitalTwin() {
 								<div className="twin-view-label twin-view-label-col">
 									<span className="twin-view-title">空间预览</span>
 									<span className="twin-sun-wrap">
-										<label className="twin-sun">
-											<input
-												type="range"
+										<div className="twin-sun">
+											<Slider
 												min={minTime}
 												max={maxTime}
-												step="0.25"
-												value={Math.min(maxTime, Math.max(minTime, time))}
-												onChange={(e) => setTime(Number(e.target.value))}
+												step={0.25}
+												value={[Math.min(maxTime, Math.max(minTime, time))]}
+												onValueChange={([value]) => setTime(value)}
+												tooltipMode="never"
 												aria-label="一天中的时间"
 											/>
 											<b>{formatHour(Math.min(maxTime, Math.max(minTime, time)))}</b>
-										</label>
-										<label className="twin-lowwall">
-											<input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} />
+										</div>
+										<Label className="twin-lowwall">
+											<Switch checked={low} onCheckedChange={setLow} />
 											低墙
-										</label>
-										<button
+										</Label>
+										<Button
 											type="button"
-											className="twin-sun-settings-btn"
+											variant="outline"
+											size="sm"
+											className="twin-sun-settings-btn h-7 text-xs"
 											onClick={() => setShowSunSettings((v) => !v)}
 											title="位置与太阳设置"
 										>
 											{showSunSettings ? "收起" : "位置与太阳"}
-										</button>
+										</Button>
 									</span>
 									{showSunSettings && (
 										<div className="twin-sun-settings">
-											<label>
+											<Label>
 												纬度
-												<input type="number" step="0.01" value={lat} onChange={(e) => setLat(Number(e.target.value))} />
-											</label>
-											<label>
+												<Input type="number" step="0.01" value={lat} onChange={(e) => setLat(Number(e.target.value))} />
+											</Label>
+											<Label>
 												经度
-												<input type="number" step="0.01" value={lon} onChange={(e) => setLon(Number(e.target.value))} />
-											</label>
-											<label>
+												<Input type="number" step="0.01" value={lon} onChange={(e) => setLon(Number(e.target.value))} />
+											</Label>
+											<Label>
 												时区 (UTC±)
-												<input type="number" step="1" value={tz} onChange={(e) => setTz(Number(e.target.value))} />
-											</label>
-											<label>
+												<Input type="number" step="1" value={tz} onChange={(e) => setTz(Number(e.target.value))} />
+											</Label>
+											<Label>
 												日期
-												<input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-											</label>
+												<Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+											</Label>
 											<span className="twin-sun-times">
 												{dayRange
 													? `日出 ${formatHour(dayRange.sunrise)} · 日落 ${formatHour(dayRange.sunset)}`
@@ -375,29 +409,34 @@ export default function HomeDigitalTwin() {
 							<div className="twin-fields">
 								{item && (
 									<>
-										<label>
+										<Label className="twin-field">
 											名称
-											<input value={item.name} maxLength={80} onChange={(e) => updateItem({ name: e.target.value })} />
-										</label>
-										<label>
+											<Input value={item.name} maxLength={80} onChange={(e) => updateItem({ name: e.target.value })} />
+										</Label>
+										<Label className="twin-field">
 											旋转角度
-											<input
+											<Input
 												type="number"
 												value={item.rotation}
 												onChange={(e) => updateItem({ rotation: Number(e.target.value) })}
 											/>
-										</label>
-										<button type="button" onClick={() => updateItem({ rotation: (item.rotation + 90) % 360 })}>
+										</Label>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											onClick={() => updateItem({ rotation: (item.rotation + 90) % 360 })}
+										>
 											<RotateCw size={16} />
 											旋转 90°
-										</button>
+										</Button>
 									</>
 								)}
 								{wall &&
 									(["height", "thickness"] as const).map((k) => (
-										<label key={k}>
+										<Label key={k} className="twin-field">
 											{k === "height" ? "墙高（m）" : "厚度（m）"}
-											<input
+											<Input
 												type="number"
 												step="0.1"
 												min={k === "height" ? 1 : 0.05}
@@ -420,12 +459,12 @@ export default function HomeDigitalTwin() {
 													})
 												}
 											/>
-										</label>
+										</Label>
 									))}
 								{opening && (
-									<label>
+									<Label className="twin-field">
 										宽度（m）
-										<input
+										<Input
 											type="number"
 											min="0.3"
 											max="3"
@@ -442,47 +481,41 @@ export default function HomeDigitalTwin() {
 												})
 											}
 										/>
-									</label>
+									</Label>
 								)}
 							</div>
 							{item && isDevice(item.kind) && (
 								<div className="twin-device">
 									<h2>
-										设备状态 <span className="twin-badge">模拟</span>
+										设备状态 <Badge variant="secondary">模拟</Badge>
 									</h2>
-									<label className="twin-toggle">
+									<Label className="twin-toggle">
 										在线
-										<input
-											type="checkbox"
-											checked={item.online}
-											onChange={(e) => updateItem({ online: e.target.checked })}
-										/>
-									</label>
+										<Switch checked={item.online} onCheckedChange={(checked) => updateItem({ online: checked })} />
+									</Label>
 									{item.kind !== "sensor" ? (
 										<>
-											<label className="twin-toggle">
+											<Label className="twin-toggle">
 												电源
-												<input
-													type="checkbox"
+												<Switch
 													disabled={!!busy || !item.online}
 													checked={item.on}
-													onChange={(e) => command(item, { on: e.target.checked })}
+													onCheckedChange={(checked) => command(item, { on: checked })}
 												/>
-											</label>
+											</Label>
 											{["light", "ac"].includes(item.kind) && (
-												<label>
+												<Label className="twin-field">
 													{item.kind === "ac" ? "温度" : "亮度"} · {item.value}
 													{item.kind === "ac" ? " °C" : " %"}
-													<input
+													<Slider
 														aria-label={item.kind === "ac" ? "温度" : "亮度"}
-														type="range"
 														min={item.kind === "ac" ? 16 : 0}
 														max={item.kind === "ac" ? 30 : 100}
 														disabled={!!busy || !item.online}
-														value={item.value}
-														onChange={(e) => command(item, { value: Number(e.target.value) })}
+														value={[item.value]}
+														onValueChange={([value]) => command(item, { value })}
 													/>
-												</label>
+												</Label>
 											)}
 										</>
 									) : (
@@ -490,21 +523,21 @@ export default function HomeDigitalTwin() {
 											24.6 °C <small>湿度 48%</small>
 										</div>
 									)}
-									<label>
+									<Label className="twin-field">
 										设备绑定 ID
-										<input
+										<Input
 											placeholder="例如 light.living_room"
 											value={item.binding}
 											onChange={(e) => updateItem({ binding: e.target.value })}
 										/>
-									</label>
+									</Label>
 									{busy === item.id && <small>正在发送指令…</small>}
 								</div>
 							)}
-							<button type="button" className="twin-delete" onClick={remove}>
+							<Button type="button" variant="destructive" className="twin-delete" onClick={remove}>
 								<Trash2 size={16} />
 								删除{item ? "物件" : wall ? "墙体" : "门窗"}
-							</button>
+							</Button>
 						</>
 					) : (
 						<div className="twin-device-list">
@@ -513,7 +546,7 @@ export default function HomeDigitalTwin() {
 								.map((i) => {
 									const Icon = icons[i.kind];
 									return (
-										<button type="button" key={i.id} onClick={() => select(i.id)}>
+										<Button type="button" variant="ghost" key={i.id} onClick={() => select(i.id)}>
 											<Icon size={18} />
 											<span>
 												{i.name}
@@ -522,31 +555,32 @@ export default function HomeDigitalTwin() {
 												</small>
 											</span>
 											<i className={i.online ? "online" : ""} />
-										</button>
+										</Button>
 									);
 								})}
 							{!plan.items.some((i) => isDevice(i.kind)) && <p className="twin-muted">暂无设备</p>}
 						</div>
 					)}
 				</aside>
-			</div>
+			</Card>
 		</div>
 	);
 	function renderTool(kind: Kind) {
 		const Icon = icons[kind];
 		return (
-			<button
+			<Button
 				type="button"
 				key={kind}
+				variant="outline"
 				draggable
 				onDragStart={(e) => e.dataTransfer.setData("twin-kind", kind)}
-				className={tool === kind ? "active" : ""}
+				className={cn("twin-tool", tool === kind && "active")}
 				onClick={() => setTool(kind)}
 				title={labels[kind]}
 			>
 				<Icon size={20} />
 				<span>{labels[kind]}</span>
-			</button>
+			</Button>
 		);
 	}
 }

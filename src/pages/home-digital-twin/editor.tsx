@@ -1,5 +1,7 @@
 import { Scan, Section, ZoomIn, ZoomOut } from "lucide-react";
 import { type PointerEvent, useEffect, useRef, useState } from "react";
+import { Button } from "@/ui/button";
+import { cn } from "@/utils";
 import { id, type Kind, labels, length, newItem, type Plan, type Point } from "./model";
 
 export default function Editor({
@@ -110,25 +112,33 @@ export default function Editor({
 		<>
 			<div className="twin-canvas-tools">
 				{tool === "wall" && (
-					<button
+					<Button
 						type="button"
+						variant="outline"
+						size="sm"
 						title="正交模式：墙体保持水平或垂直，按住 Shift 可临时开启"
-						className={ortho ? "active" : ""}
+						className={cn(ortho && "active")}
 						onClick={() => setOrtho(!ortho)}
 					>
 						<Section size={16} />
 						<span>正交</span>
-					</button>
+					</Button>
 				)}
-				<button type="button" title="放大平面图" onClick={() => zoom(0.8)}>
+				<Button type="button" variant="outline" size="icon" title="放大平面图" onClick={() => zoom(0.8)}>
 					<ZoomIn size={16} />
-				</button>
-				<button type="button" title="缩小平面图" onClick={() => zoom(1.25)}>
+				</Button>
+				<Button type="button" variant="outline" size="icon" title="缩小平面图" onClick={() => zoom(1.25)}>
 					<ZoomOut size={16} />
-				</button>
-				<button type="button" title="重置平面视图" onClick={() => setFrame({ x: 0, y: 0, size: 1000 })}>
+				</Button>
+				<Button
+					type="button"
+					variant="outline"
+					size="icon"
+					title="重置平面视图"
+					onClick={() => setFrame({ x: 0, y: 0, size: 1000 })}
+				>
 					<Scan size={16} />
-				</button>
+				</Button>
 			</div>
 			<svg
 				ref={svg}
@@ -206,7 +216,7 @@ export default function Editor({
 							y1={w.a.y * 50}
 							x2={w.b.x * 50}
 							y2={w.b.y * 50}
-							stroke={selected === w.id ? "#159b80" : "#61746d"}
+							stroke={selected === w.id ? "var(--primary)" : "#61746d"}
 							strokeWidth={w.thickness * 50}
 							strokeLinecap="square"
 							onPointerDown={(e) => {
@@ -248,7 +258,7 @@ export default function Editor({
 									cy={w[end].y * 50}
 									r="7"
 									fill="#fff"
-									stroke="#159b80"
+									stroke="var(--primary)"
 									strokeWidth="2"
 									onPointerDown={(e) => {
 										e.stopPropagation();
@@ -277,7 +287,7 @@ export default function Editor({
 								width={o.width * 50}
 								height={12}
 								fill={o.kind === "door" ? "#e7d8ab" : "#b5e5ef"}
-								stroke={selected === o.id ? "#159b80" : "#79968b"}
+								stroke={selected === o.id ? "var(--primary)" : "#79968b"}
 							/>
 						</g>
 					);
@@ -301,7 +311,7 @@ export default function Editor({
 							height={i.kind === "bed" ? 100 : 44}
 							rx="5"
 							fill={i.on ? "#f7e4a3" : "#dce8e3"}
-							stroke={selected === i.id ? "#069879" : "#9eb5aa"}
+							stroke={selected === i.id ? "var(--primary)" : "#9eb5aa"}
 							strokeWidth={selected === i.id ? 3 : 1.5}
 						/>
 						<text textAnchor="middle" dominantBaseline="middle" fontSize="12" fill="#355c4e">
@@ -315,7 +325,7 @@ export default function Editor({
 						y1={start.y * 50}
 						x2={cursor.x * 50}
 						y2={cursor.y * 50}
-						stroke="#159b80"
+						stroke="var(--primary)"
 						strokeWidth="6"
 						strokeDasharray="8 5"
 					/>

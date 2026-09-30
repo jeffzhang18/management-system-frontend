@@ -2,6 +2,8 @@ import { Grid, Html, OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Component, type ReactNode, useEffect, useRef } from "react";
 import type * as THREE from "three";
+import { useSettings } from "@/store/settingStore";
+import { presetsColors } from "@/theme/tokens/color";
 import { type Item, isDevice, length, type Plan } from "./model";
 import { type SunConfig, type SunPosition, sunPosition } from "./sun";
 
@@ -65,9 +67,19 @@ function Box({
 		</mesh>
 	);
 }
-function Object3D({ item, selected, select }: { item: Item; selected: boolean; select: () => void }) {
+function Object3D({
+	item,
+	selected,
+	select,
+	primary,
+}: {
+	item: Item;
+	selected: boolean;
+	select: () => void;
+	primary: string;
+}) {
 	const color = selected
-		? "#16a085"
+		? primary
 		: isDevice(item.kind)
 			? !item.online
 				? "#9ca3af"
@@ -158,6 +170,8 @@ export default function Scene({
 	time?: number;
 	sunCfg?: SunConfig;
 }) {
+	const { themeColorPresets } = useSettings();
+	const primary = presetsColors[themeColorPresets].default;
 	const sun = sunPosition(sunCfg, time);
 	return (
 		<SceneBoundary>
@@ -194,7 +208,7 @@ export default function Scene({
 						<Box
 							position={[0, (top ? 0.25 : w.height) / 2, 0]}
 							size={[length(w), top ? 0.25 : w.height, w.thickness]}
-							color={selected === w.id ? "#63b7a5" : "#d0d8d6"}
+							color={selected === w.id ? primary : "#d0d8d6"}
 						/>
 						{plan.openings
 							.filter((o) => o.wallId === w.id)
@@ -209,7 +223,13 @@ export default function Scene({
 					</group>
 				))}
 				{plan.items.map((item) => (
-					<Object3D key={item.id} item={item} selected={selected === item.id} select={() => select(item.id)} />
+					<Object3D
+						key={item.id}
+						item={item}
+						selected={selected === item.id}
+						select={() => select(item.id)}
+						primary={primary}
+					/>
 				))}
 				<OrbitControls makeDefault target={[7, 0, 6]} minDistance={4} maxDistance={45} maxPolarAngle={Math.PI / 2.05} />
 			</Canvas>
