@@ -43,15 +43,15 @@ interface SelectedCityWeather {
 }
 
 const weatherImageMap = {
-	sunny: "https://api.iconify.design/qlementine-icons:sun-16.svg?color=%23f59e0b",
-	cloudy: "https://api.iconify.design/qlementine-icons:cloud-16.svg?color=%2364748b",
-	partlyCloudy: "https://api.iconify.design/mdi:weather-partly-cloudy.svg?color=%23f59e0b",
-	rain: "https://api.iconify.design/mdi:weather-rainy.svg?color=%230ea5e9",
-	snow: "https://api.iconify.design/mdi:weather-snowy.svg?color=%2338bdf8",
-	thunder: "https://api.iconify.design/mdi:weather-lightning-rainy.svg?color=%237c3aed",
-	fog: "https://api.iconify.design/mdi:weather-fog.svg?color=%2394a3b8",
-	wind: "https://api.iconify.design/mdi:weather-windy.svg?color=%2306b6d4",
-	default: "https://api.iconify.design/mdi:weather-partly-cloudy.svg?color=%230ea5e9",
+	sunny: "https://api.iconify.design/qlementine-icons/sun-16.svg?color=%23f59e0b",
+	cloudy: "https://api.iconify.design/qlementine-icons/cloud-16.svg?color=%2364748b",
+	partlyCloudy: "https://api.iconify.design/mdi/weather-partly-cloudy.svg?color=%23f59e0b",
+	rain: "https://api.iconify.design/mdi/weather-rainy.svg?color=%230ea5e9",
+	snow: "https://api.iconify.design/mdi/weather-snowy.svg?color=%2338bdf8",
+	thunder: "https://api.iconify.design/mdi/weather-lightning-rainy.svg?color=%237c3aed",
+	fog: "https://api.iconify.design/mdi/weather-fog.svg?color=%2394a3b8",
+	wind: "https://api.iconify.design/mdi/weather-windy.svg?color=%2306b6d4",
+	default: "https://api.iconify.design/mdi/weather-partly-cloudy.svg?color=%230ea5e9",
 } as const;
 
 const weatherTextRules = [

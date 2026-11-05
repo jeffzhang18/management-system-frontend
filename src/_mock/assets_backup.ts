@@ -13,6 +13,16 @@ export const DB_MENU: Menu[] = [
 
 	// group_dashboard
 	{
+		id: "subscriptions",
+		parentId: "group_dashboard",
+		name: "sys.nav.subscriptions",
+		code: "subscriptions",
+		icon: "solar:card-recive-bold-duotone",
+		type: MENU,
+		path: "/subscriptions",
+		component: "/pages/subscriptions",
+	},
+	{
 		id: "home-digital-twin",
 		parentId: "group_dashboard",
 		name: "sys.nav.homeDigitalTwin",

@@ -35,6 +35,7 @@
 		"@vanilla-extract/vite-plugin": "^5.0.7",
 		"@vercel/analytics": "^1.5.0",
 		"@vitejs/plugin-react": "^4.3.3",
+		"@zakisheriff/liquid-glass": "0.3.20",
 		"antd": "^5.22.1",
 		"apexcharts": "^4.5.0",
 		"axios": "^1.7.7",

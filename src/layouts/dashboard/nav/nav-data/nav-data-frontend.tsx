@@ -27,6 +27,11 @@ export const frontendNavData: NavProps["data"] = [
 				icon: <Icon icon="local:ic-weather" size="24" />,
 			},
 			{
+				title: "sys.nav.subscriptions",
+				path: "/subscriptions",
+				icon: <Icon icon="solar:card-recive-bold-duotone" size="24" />,
+			},
+			{
 				title: "sys.nav.homeDigitalTwin",
 				path: "/home-digital-twin",
 				icon: <Icon icon="solar:home-2-bold-duotone" size="24" />,
