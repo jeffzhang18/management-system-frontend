@@ -31,7 +31,7 @@ import { useUserInfo } from "@/store/userStore";
 import { Button } from "@/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdown-menu";
 import { GlassAction, GlassPanel } from "./glass";
-import { convertAmount, formatMoney } from "./money.test";
+import { convertAmount, formatMoney } from "./money";
 import { SubscriptionForm } from "./subscription-form";
 import "./subscriptions.css";
 
