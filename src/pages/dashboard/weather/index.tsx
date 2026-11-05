@@ -27,6 +27,7 @@ import { useTranslation } from "react-i18next";
 import { LocalEnum, StorageEnum } from "#/enum";
 import type { LocationInfo, SavedLocationItem, WeatherNowInfo } from "@/api/services/weatherService";
 import weatherService from "@/api/services/weatherService";
+import { Icon } from "@/components/icon";
 import { themeVars } from "@/theme/theme.css";
 import { Button } from "@/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/ui/card";
@@ -43,15 +44,15 @@ interface SelectedCityWeather {
 }
 
 const weatherImageMap = {
-	sunny: "https://api.iconify.design/qlementine-icons/sun-16.svg?color=%23f59e0b",
-	cloudy: "https://api.iconify.design/qlementine-icons/cloud-16.svg?color=%2364748b",
-	partlyCloudy: "https://api.iconify.design/mdi/weather-partly-cloudy.svg?color=%23f59e0b",
-	rain: "https://api.iconify.design/mdi/weather-rainy.svg?color=%230ea5e9",
-	snow: "https://api.iconify.design/mdi/weather-snowy.svg?color=%2338bdf8",
-	thunder: "https://api.iconify.design/mdi/weather-lightning-rainy.svg?color=%237c3aed",
-	fog: "https://api.iconify.design/mdi/weather-fog.svg?color=%2394a3b8",
-	wind: "https://api.iconify.design/mdi/weather-windy.svg?color=%2306b6d4",
-	default: "https://api.iconify.design/mdi/weather-partly-cloudy.svg?color=%230ea5e9",
+	sunny: { icon: "qlementine-icons:sun-16", color: "#f59e0b" },
+	cloudy: { icon: "qlementine-icons:cloud-16", color: "#64748b" },
+	partlyCloudy: { icon: "mdi:weather-partly-cloudy", color: "#f59e0b" },
+	rain: { icon: "mdi:weather-rainy", color: "#0ea5e9" },
+	snow: { icon: "mdi:weather-snowy", color: "#38bdf8" },
+	thunder: { icon: "mdi:weather-lightning-rainy", color: "#7c3aed" },
+	fog: { icon: "mdi:weather-fog", color: "#94a3b8" },
+	wind: { icon: "mdi:weather-windy", color: "#06b6d4" },
+	default: { icon: "mdi:weather-partly-cloudy", color: "#0ea5e9" },
 } as const;
 
 const weatherTextRules = [
@@ -978,11 +979,12 @@ function SortableWeatherCard({
 
 					<div className="grid min-w-0 grid-rows-[112px_minmax(0,1fr)] gap-3">
 						<div style={softPanelStyle} className="flex items-center justify-center rounded-[28px] p-4 shadow-sm">
-							<img
-								src={getWeatherImage(city.weather)}
-								alt={city.loading ? t("common.loadingText") : `${city.location.name} ${weatherText}`}
-								className="h-16 w-16 shrink-0 drop-shadow-sm"
-								loading="lazy"
+							<Icon
+								{...getWeatherImage(city.weather)}
+								size={64}
+								role="img"
+								aria-label={city.loading ? t("common.loadingText") : `${city.location.name} ${weatherText}`}
+								className="shrink-0 drop-shadow-sm"
 							/>
 						</div>
 					</div>

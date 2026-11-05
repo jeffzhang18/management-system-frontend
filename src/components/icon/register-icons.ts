@@ -1,5 +1,6 @@
-import { addCollection } from "@iconify/react";
+import { addCollection } from "@iconify/react/offline";
 import { parseSVGContent } from "@iconify/utils/lib/svg/parse";
+import { bundledIconCollections } from "./bundled-icons.generated";
 
 interface IconifyIcon {
 	body: string;
@@ -93,14 +94,16 @@ export default async function registerLocalIcons() {
 	iconCollection = icons;
 
 	// Add the entire collection at once
-	const result = addCollection({
+	addCollection({
 		prefix: "local",
 		icons,
 		width: 24,
 		height: 24,
 	});
 
-	if (!result) {
-		console.warn("Failed to add icon collection");
+	// Register the third-party icons generated at build time. Keeping these
+	// collections in the application bundle avoids runtime Iconify API calls.
+	for (const collection of bundledIconCollections) {
+		addCollection(collection as unknown as Parameters<typeof addCollection>[0]);
 	}
 }

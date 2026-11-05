@@ -1,7 +1,7 @@
-import { cn } from "@/utils";
-import { Icon as IconifyIcon } from "@iconify/react";
-import type { IconProps as IconifyIconProps } from "@iconify/react";
+import type { IconProps as IconifyIconProps } from "@iconify/react/offline";
+import { Icon as IconifyIcon } from "@iconify/react/offline";
 import type { CSSProperties } from "react";
+import { cn } from "@/utils";
 
 interface IconProps extends IconifyIconProps {
 	/**
@@ -17,7 +17,14 @@ interface IconProps extends IconifyIconProps {
 	style?: CSSProperties;
 }
 
-export default function Icon({ icon, size = "1em", color = "currentColor", className = "", style = {}, ...props }: IconProps) {
+export default function Icon({
+	icon,
+	size = "1em",
+	color = "currentColor",
+	className = "",
+	style = {},
+	...props
+}: IconProps) {
 	// Handle URL SVG
 	if (icon.startsWith("url:")) {
 		const url = icon.replace("url:", "");
