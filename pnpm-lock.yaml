@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@zakisheriff/liquid-glass@0.3.20':
+    hash: 6f4a7ae315c156b5a970de779ba0a8eb85d9669fce6a8adfe3d860cac3370281
+    path: patches/@zakisheriff__liquid-glass@0.3.20.patch
+
 importers:
 
   .:
@@ -79,7 +84,7 @@ importers:
         version: 4.4.1(vite@6.3.3(@types/node@20.5.1)(jiti@2.4.2)(lightningcss@1.29.2)(tsx@4.19.4))
       '@zakisheriff/liquid-glass':
         specifier: 0.3.20
-        version: 0.3.20(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+        version: 0.3.20(patch_hash=6f4a7ae315c156b5a970de779ba0a8eb85d9669fce6a8adfe3d860cac3370281)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       antd:
         specifier: ^5.22.1
         version: 5.24.8(date-fns@4.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -7137,7 +7142,7 @@ snapshots:
 
   '@yr/monotone-cubic-spline@1.0.3': {}
 
-  '@zakisheriff/liquid-glass@0.3.20(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
+  '@zakisheriff/liquid-glass@0.3.20(patch_hash=6f4a7ae315c156b5a970de779ba0a8eb85d9669fce6a8adfe3d860cac3370281)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)

@@ -1,0 +1,168 @@
+diff --git a/dist/index.js b/dist/index.js
+index 8ae6c8969d9e16a45c58a14b32b3a1f003224169..0f642cd57d2d7470c2f29d77e3eed64e97dc7e2f 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -93,8 +93,15 @@ function step(s, dt) {
+     s.velocity = decay * (v * cos - (half * v + s.k * x) / w * sin);
+   }
+ }
++var springPaints = /* @__PURE__ */ new Set();
++var updatingSprings = false;
++function requestLensPaint(paint) {
++  if (updatingSprings) springPaints.add(paint);
++  else paint();
++}
+ function loop(time) {
+   frame = 0;
++  updatingSprings = true;
+   const dt = Math.min(0.064, Math.max(0, (time - last) / 1e3));
+   last = time;
+   for (const s of [...active]) {
+@@ -106,6 +113,9 @@ function loop(time) {
+     }
+     s.onUpdate(s.value, s.velocity);
+   }
++  updatingSprings = false;
++  for (const paint of springPaints) paint();
++  springPaints.clear();
+   if (active.size && !frame) frame = requestAnimationFrame(loop);
+ }
+ function wake() {
+@@ -543,12 +553,9 @@ function mirrorBackdrop(glass, source, padding, zoom, active2 = () => true) {
+     if (records.every((r) => layer.contains(r.target) || r.target === layer || r.target === glass)) return;
+     wake2();
+     const structural = records.some((r) => r.type !== "attributes" && !layer.contains(r.target));
++    // The animation frame already syncs and aligns while the mirror is active.
++    // Doing it here as well forces layout after every animated style mutation.
+     if (structural && !pending) pending = requestAnimationFrame(recopy);
+-    else if (!structural && !stopped && visible && !document.hidden && active2()) {
+-      applyZoom();
+-      sync();
+-      align();
+-    }
+   });
+   mutations.observe(source, { childList: true, characterData: true, attributes: true, attributeFilter: ["style", "class"], subtree: true });
+   const io = typeof IntersectionObserver === "function" ? new IntersectionObserver((entries) => {
+@@ -1904,24 +1911,24 @@ function useLensTrack(refs, options) {
+     let dragging = false;
+     const jelly = createJelly((value) => {
+       state.squash = value;
+-      paint();
++      requestLensPaint(paint);
+     }, 0.13, 1600);
+     const x = createSpring(current * slot, SPRINGS.snap, (value, velocity) => {
+       state.x = value;
+       jelly.feed(velocity, dragging ? WOBBLE_REACH : void 0);
+-      paint();
++      requestLensPaint(paint);
+     });
+     const lift = createSpring(0, SPRINGS.lift, (value) => {
+       state.lift = value;
+-      paint();
++      requestLensPaint(paint);
+     });
+     const swell = createSpring(0, SPRINGS.press, (value) => {
+       state.swell = value;
+-      paint();
++      requestLensPaint(paint);
+     });
+     const pullY = createSpring(0, SPRINGS.release, (value) => {
+       state.pull = value;
+-      paint();
++      requestLensPaint(paint);
+     });
+     const pull = (dy) => {
+       if (latest.current.pull === false) return;
+@@ -1979,7 +1986,7 @@ function useLensTrack(refs, options) {
+       swell.set(1);
+       x.tune(SPRINGS.snap);
+       x.set(index * slot);
+-      paint();
++      requestLensPaint(paint);
+     };
+     const onMove = (event) => {
+       if (event.pointerId !== gesture?.id) return;
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 221fa29b46b7b3a635523e808bc5fdb0112e157f..880692263dc9abaa8c513663319356361ecb68ea 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -39,8 +39,15 @@ function step(s, dt) {
+     s.velocity = decay * (v * cos - (half * v + s.k * x) / w * sin);
+   }
+ }
++var springPaints = /* @__PURE__ */ new Set();
++var updatingSprings = false;
++function requestLensPaint(paint) {
++  if (updatingSprings) springPaints.add(paint);
++  else paint();
++}
+ function loop(time) {
+   frame = 0;
++  updatingSprings = true;
+   const dt = Math.min(0.064, Math.max(0, (time - last) / 1e3));
+   last = time;
+   for (const s of [...active]) {
+@@ -52,6 +59,9 @@ function loop(time) {
+     }
+     s.onUpdate(s.value, s.velocity);
+   }
++  updatingSprings = false;
++  for (const paint of springPaints) paint();
++  springPaints.clear();
+   if (active.size && !frame) frame = requestAnimationFrame(loop);
+ }
+ function wake() {
+@@ -489,12 +499,9 @@ function mirrorBackdrop(glass, source, padding, zoom, active2 = () => true) {
+     if (records.every((r) => layer.contains(r.target) || r.target === layer || r.target === glass)) return;
+     wake2();
+     const structural = records.some((r) => r.type !== "attributes" && !layer.contains(r.target));
++    // The animation frame already syncs and aligns while the mirror is active.
++    // Doing it here as well forces layout after every animated style mutation.
+     if (structural && !pending) pending = requestAnimationFrame(recopy);
+-    else if (!structural && !stopped && visible && !document.hidden && active2()) {
+-      applyZoom();
+-      sync();
+-      align();
+-    }
+   });
+   mutations.observe(source, { childList: true, characterData: true, attributes: true, attributeFilter: ["style", "class"], subtree: true });
+   const io = typeof IntersectionObserver === "function" ? new IntersectionObserver((entries) => {
+@@ -1850,24 +1857,24 @@ function useLensTrack(refs, options) {
+     let dragging = false;
+     const jelly = createJelly((value) => {
+       state.squash = value;
+-      paint();
++      requestLensPaint(paint);
+     }, 0.13, 1600);
+     const x = createSpring(current * slot, SPRINGS.snap, (value, velocity) => {
+       state.x = value;
+       jelly.feed(velocity, dragging ? WOBBLE_REACH : void 0);
+-      paint();
++      requestLensPaint(paint);
+     });
+     const lift = createSpring(0, SPRINGS.lift, (value) => {
+       state.lift = value;
+-      paint();
++      requestLensPaint(paint);
+     });
+     const swell = createSpring(0, SPRINGS.press, (value) => {
+       state.swell = value;
+-      paint();
++      requestLensPaint(paint);
+     });
+     const pullY = createSpring(0, SPRINGS.release, (value) => {
+       state.pull = value;
+-      paint();
++      requestLensPaint(paint);
+     });
+     const pull = (dy) => {
+       if (latest.current.pull === false) return;
+@@ -1925,7 +1932,7 @@ function useLensTrack(refs, options) {
+       swell.set(1);
+       x.tune(SPRINGS.snap);
+       x.set(index * slot);
+-      paint();
++      requestLensPaint(paint);
+     };
+     const onMove = (event) => {
+       if (event.pointerId !== gesture?.id) return;

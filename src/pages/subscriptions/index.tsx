@@ -16,7 +16,7 @@ import {
 	Smartphone,
 	Trash2,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import subscriptionService, {
@@ -29,6 +29,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { useSettings } from "@/store/settingStore";
 import { useUserInfo } from "@/store/userStore";
 import { Button } from "@/ui/button";
+import { Card } from "@/ui/card";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdown-menu";
 import { GlassAction, GlassPanel } from "./glass";
 import { convertAmount, formatMoney } from "./money";
@@ -44,15 +45,34 @@ function initialCurrency(): Currency {
 	}
 }
 
+const EMPTY_SUBSCRIPTIONS: Subscription[] = [];
+
+const SubscriptionTable = memo(function SubscriptionTable({
+	items,
+	columns,
+}: {
+	items: Subscription[];
+	columns: ColumnsType<Subscription>;
+}) {
+	return (
+		<Table<Subscription>
+			rowKey="id"
+			dataSource={items}
+			columns={columns}
+			scroll={{ x: 1035 }}
+			pagination={{ pageSize: 10, hideOnSinglePage: true, showSizeChanger: false }}
+		/>
+	);
+});
+
 export default function SubscriptionsPage() {
 	const { t, i18n } = useTranslation();
-	const label = (key: string) => t(`subscriptions.${key}`);
+	const label = useCallback((key: string) => t(`subscriptions.${key}`), [t]);
 	const { modal } = App.useApp();
 	const queryClient = useQueryClient();
 	const user = useUserInfo();
 	const { themeMode } = useSettings();
 	const mobile = useMediaQuery({ maxWidth: 767 });
-	const reducedMotion = useMediaQuery({ prefersReducedMotion: true });
 	const [currency, setCurrency] = useState<Currency>(initialCurrency);
 	const [search, setSearch] = useState("");
 	const [device, setDevice] = useState<Device | "all">("all");
@@ -62,7 +82,7 @@ export default function SubscriptionsPage() {
 	const [deleting, setDeleting] = useState<string>();
 	const addRef = useRef<HTMLButtonElement>(null);
 	const editTrigger = useRef<HTMLElement | null>(null);
-	const queryKey = ["subscriptions", user.id];
+	const queryKey = useMemo(() => ["subscriptions", user.id], [user.id]);
 	const list = useQuery({
 		queryKey: [...queryKey, "list"],
 		queryFn: subscriptionService.list,
@@ -75,17 +95,24 @@ export default function SubscriptionsPage() {
 		retry: false,
 		refetchInterval: 60_000,
 	});
-	const refresh = () => queryClient.invalidateQueries({ queryKey });
-	const money = (amount?: string | null, unit = currency) => formatMoney(amount, unit, i18n.language);
-	const items = list.data?.items ?? [];
-	const visible = items.filter(
-		(item) =>
-			item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) &&
-			(device === "all" || item.devices.includes(device)) &&
-			(filter === 0 ||
-				(filter === 1 && item.status === "active") ||
-				(filter === 2 && item.upcoming) ||
-				(filter === 3 && item.status === "ended")),
+	const refresh = useCallback(() => queryClient.invalidateQueries({ queryKey }), [queryClient, queryKey]);
+	const money = useCallback(
+		(amount?: string | null, unit = currency) => formatMoney(amount, unit, i18n.language),
+		[currency, i18n.language],
+	);
+	const items = list.data?.items ?? EMPTY_SUBSCRIPTIONS;
+	const visible = useMemo(
+		() =>
+			items.filter(
+				(item) =>
+					item.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) &&
+					(device === "all" || item.devices.includes(device)) &&
+					(filter === 0 ||
+						(filter === 1 && item.status === "active") ||
+						(filter === 2 && item.upcoming) ||
+						(filter === 3 && item.status === "ended")),
+			),
+		[items, search, device, filter],
 	);
 	const exchange = summary.data?.exchange;
 	const openAdd = () => {
@@ -93,11 +120,11 @@ export default function SubscriptionsPage() {
 		editTrigger.current = null;
 		setFormOpen(true);
 	};
-	const openEdit = (item: Subscription) => {
+	const openEdit = useCallback((item: Subscription) => {
 		editTrigger.current = document.activeElement as HTMLElement;
 		setEditing(item);
 		setFormOpen(true);
-	};
+	}, []);
 	const closeForm = () => {
 		setFormOpen(false);
 		requestAnimationFrame(() => {
@@ -105,148 +132,181 @@ export default function SubscriptionsPage() {
 			else addRef.current?.focus();
 		});
 	};
-	const cycleLabel = (item: Subscription) => {
-		if (item.cycleUnit === "once") return label("cycles.once");
-		if (item.cycleUnit === "year" && item.cycleInterval === 1) return label("cycles.annual");
-		if (item.cycleUnit === "month") {
-			const key = ({ 1: "monthly", 3: "quarterly", 6: "semiannual" } as Record<number, string>)[item.cycleInterval];
-			if (key) return label(`cycles.${key}`);
-		}
-		return t("subscriptions.customCycle", { count: item.cycleInterval, unit: label(`units.${item.cycleUnit}`) });
-	};
-	const remove = (item: Subscription) => {
-		modal.confirm({
-			title: label("delete"),
-			content: t("subscriptions.deleteConfirm", { name: item.name }),
-			okText: label("delete"),
-			cancelText: label("cancel"),
-			okButtonProps: { danger: true },
-			onOk: async () => {
-				setDeleting(item.id);
-				try {
-					await subscriptionService.remove(item.id);
-					toast.success(label("deleted"));
-					await refresh();
-				} finally {
-					setDeleting(undefined);
-				}
-			},
-		});
-	};
-	const actions = (item: Subscription) => (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button
-					variant="ghost"
-					size="icon"
-					aria-label={t("subscriptions.actionsFor", { name: item.name })}
-					disabled={deleting === item.id}
-				>
-					<MoreHorizontal size={18} />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align="end">
-				<DropdownMenuItem onSelect={() => openEdit(item)}>
-					<Pencil size={15} />
-					{label("edit")}
-				</DropdownMenuItem>
-				<DropdownMenuItem className="text-red-500" onSelect={() => remove(item)}>
-					<Trash2 size={15} />
-					{label("delete")}
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-	const status = (item: Subscription) => (
-		<Tag
-			bordered={false}
-			color={
-				item.upcoming ? "orange" : item.status === "active" ? "green" : item.status === "scheduled" ? "blue" : "default"
+	const cycleLabel = useCallback(
+		(item: Subscription) => {
+			if (item.cycleUnit === "once") return label("cycles.once");
+			if (item.cycleUnit === "year" && item.cycleInterval === 1) return label("cycles.annual");
+			if (item.cycleUnit === "month") {
+				const key = ({ 1: "monthly", 3: "quarterly", 6: "semiannual" } as Record<number, string>)[item.cycleInterval];
+				if (key) return label(`cycles.${key}`);
 			}
-		>
-			{label(item.upcoming ? "status.upcoming" : `status.${item.status}`)}
-		</Tag>
+			return t("subscriptions.customCycle", { count: item.cycleInterval, unit: label(`units.${item.cycleUnit}`) });
+		},
+		[label, t],
 	);
-	const devices = (item: Subscription) => (
-		<div className="subscription-devices">
-			{item.devices.map((value) => {
-				const Icon = value === "phone" ? Smartphone : value === "computer" ? Laptop : Layers3;
-				return (
-					<span key={value}>
-						<Icon size={13} />
-						{label(`device.${value}`)}
-					</span>
-				);
-			})}
-		</div>
+	const remove = useCallback(
+		(item: Subscription) => {
+			modal.confirm({
+				title: label("delete"),
+				content: t("subscriptions.deleteConfirm", { name: item.name }),
+				okText: label("delete"),
+				cancelText: label("cancel"),
+				okButtonProps: { danger: true },
+				onOk: async () => {
+					setDeleting(item.id);
+					try {
+						await subscriptionService.remove(item.id);
+						toast.success(label("deleted"));
+						await refresh();
+					} finally {
+						setDeleting(undefined);
+					}
+				},
+			});
+		},
+		[modal, label, t, refresh],
 	);
-	const price = (item: Subscription) => {
-		const converted = convertAmount(item.amount, item.currency, currency, exchange);
-		return (
-			<div className="subscription-price">
-				<strong>{money(item.amount, item.currency)}</strong>
-				<span>{cycleLabel(item)}</span>
-				{item.currency !== currency && (
-					<small>{converted == null ? label("conversionUnavailable") : `≈ ${money(converted)}`}</small>
+	const actions = useCallback(
+		(item: Subscription) => (
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						variant="ghost"
+						size="icon"
+						aria-label={t("subscriptions.actionsFor", { name: item.name })}
+						disabled={deleting === item.id}
+					>
+						<MoreHorizontal size={18} />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuItem onSelect={() => openEdit(item)}>
+						<Pencil size={15} />
+						{label("edit")}
+					</DropdownMenuItem>
+					<DropdownMenuItem className="text-red-500" onSelect={() => remove(item)}>
+						<Trash2 size={15} />
+						{label("delete")}
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		),
+		[deleting, t, openEdit, remove, label],
+	);
+	const status = useCallback(
+		(item: Subscription) => (
+			<Tag
+				bordered={false}
+				color={
+					item.upcoming
+						? "orange"
+						: item.status === "active"
+							? "green"
+							: item.status === "scheduled"
+								? "blue"
+								: "default"
+				}
+			>
+				{label(item.upcoming ? "status.upcoming" : `status.${item.status}`)}
+			</Tag>
+		),
+		[label],
+	);
+	const devices = useCallback(
+		(item: Subscription) => (
+			<div className="subscription-devices">
+				{item.devices.map((value) => {
+					const Icon = value === "phone" ? Smartphone : value === "computer" ? Laptop : Layers3;
+					return (
+						<span key={value}>
+							<Icon size={13} />
+							{label(`device.${value}`)}
+						</span>
+					);
+				})}
+			</div>
+		),
+		[label],
+	);
+	const price = useCallback(
+		(item: Subscription) => {
+			const converted = convertAmount(item.amount, item.currency, currency, exchange);
+			return (
+				<div className="subscription-price">
+					<strong>{money(item.amount, item.currency)}</strong>
+					<span>{cycleLabel(item)}</span>
+					{item.currency !== currency && (
+						<small>{converted == null ? label("conversionUnavailable") : `≈ ${money(converted)}`}</small>
+					)}
+				</div>
+			);
+		},
+		[currency, exchange, money, cycleLabel, label],
+	);
+	const name = useCallback(
+		(item: Subscription) => (
+			<div className="subscription-name">
+				<span className={`subscription-avatar subscription-avatar-${(item.name.codePointAt(0) ?? 0) % 5}`}>
+					{Array.from(item.name)[0]?.toUpperCase()}
+				</span>
+				<div>
+					<strong>{item.name}</strong>
+					{status(item)}
+				</div>
+			</div>
+		),
+		[status],
+	);
+	const nextDate = useCallback(
+		(item: Subscription) => (
+			<div className="subscription-next">
+				{item.nextRenewalDate ? (
+					<>
+						<strong>{item.nextRenewalDate}</strong>
+						<span>{label("nextRenewal")}</span>
+					</>
+				) : item.expiresOn ? (
+					<>
+						<strong>{item.expiresOn}</strong>
+						<span>{label("expiresOn")}</span>
+					</>
+				) : (
+					<span>{label(item.cycleUnit === "once" ? "lifetime" : "noRenewal")}</span>
 				)}
 			</div>
-		);
-	};
-	const name = (item: Subscription) => (
-		<div className="subscription-name">
-			<span className={`subscription-avatar subscription-avatar-${(item.name.codePointAt(0) ?? 0) % 5}`}>
-				{Array.from(item.name)[0]?.toUpperCase()}
-			</span>
-			<div>
-				<strong>{item.name}</strong>
-				{status(item)}
-			</div>
-		</div>
+		),
+		[label],
 	);
-	const nextDate = (item: Subscription) => (
-		<div className="subscription-next">
-			{item.nextRenewalDate ? (
-				<>
-					<strong>{item.nextRenewalDate}</strong>
-					<span>{label("nextRenewal")}</span>
-				</>
-			) : item.expiresOn ? (
-				<>
-					<strong>{item.expiresOn}</strong>
-					<span>{label("expiresOn")}</span>
-				</>
-			) : (
-				<span>{label(item.cycleUnit === "once" ? "lifetime" : "noRenewal")}</span>
-			)}
-		</div>
+	const columns: ColumnsType<Subscription> = useMemo(
+		() => [
+			{
+				title: label("name"),
+				key: "name",
+				width: 230,
+				render: (_, item) => name(item),
+				sorter: (a, b) => a.name.localeCompare(b.name),
+			},
+			{ title: label("devices"), key: "devices", width: 155, render: (_, item) => devices(item) },
+			{ title: label("cyclePrice"), key: "price", width: 180, render: (_, item) => price(item) },
+			{ title: label("startDate"), dataIndex: "startDate", width: 130 },
+			{ title: label("endDate"), key: "endDate", width: 130, render: (_, item) => item.endDate ?? "—" },
+			{
+				title: label("nextDate"),
+				key: "next",
+				width: 155,
+				render: (_, item) => nextDate(item),
+				sorter: (a, b) =>
+					(a.nextRenewalDate ?? a.expiresOn ?? "9999").localeCompare(b.nextRenewalDate ?? b.expiresOn ?? "9999"),
+			},
+			{
+				title: <span className="sr-only">{label("actions")}</span>,
+				key: "actions",
+				width: 55,
+				render: (_, item) => actions(item),
+			},
+		],
+		[label, name, devices, price, nextDate, actions],
 	);
-	const columns: ColumnsType<Subscription> = [
-		{
-			title: label("name"),
-			key: "name",
-			width: 230,
-			render: (_, item) => name(item),
-			sorter: (a, b) => a.name.localeCompare(b.name),
-		},
-		{ title: label("devices"), key: "devices", width: 155, render: (_, item) => devices(item) },
-		{ title: label("cyclePrice"), key: "price", width: 180, render: (_, item) => price(item) },
-		{ title: label("startDate"), dataIndex: "startDate", width: 130 },
-		{ title: label("endDate"), key: "endDate", width: 130, render: (_, item) => item.endDate ?? "—" },
-		{
-			title: label("nextDate"),
-			key: "next",
-			width: 155,
-			render: (_, item) => nextDate(item),
-			sorter: (a, b) =>
-				(a.nextRenewalDate ?? a.expiresOn ?? "9999").localeCompare(b.nextRenewalDate ?? b.expiresOn ?? "9999"),
-		},
-		{
-			title: <span className="sr-only">{label("actions")}</span>,
-			key: "actions",
-			width: 55,
-			render: (_, item) => actions(item),
-		},
-	];
 	const metrics = [
 		{
 			key: "activeCount",
@@ -282,13 +342,9 @@ export default function SubscriptionsPage() {
 		},
 	];
 	return (
-		<div className="subscriptions-page" data-theme={themeMode} data-reduced-motion={reducedMotion}>
+		<div className="subscriptions-page" data-theme={themeMode}>
 			<header className="subscription-header">
 				<div>
-					<div className="subscription-eyebrow">
-						<span />
-						{label("eyebrow")}
-					</div>
 					<h1>{label("title")}</h1>
 					<p>{label("description")}</p>
 				</div>
@@ -311,7 +367,7 @@ export default function SubscriptionsPage() {
 							options={currencies.map((value) => ({ value, label: value }))}
 						/>
 					</div>
-					<GlassAction ref={addRef} variant="filled" icon={<Plus size={18} />} onClick={openAdd}>
+					<GlassAction ref={addRef} variant="filled" icon={<Plus size={16} />} onClick={openAdd}>
 						{label("add")}
 					</GlassAction>
 				</div>
@@ -354,7 +410,7 @@ export default function SubscriptionsPage() {
 					</Button>
 				)}
 			</output>
-			<GlassPanel className="subscription-list-panel" padding="0">
+			<Card className="subscription-list-panel">
 				<div className="subscription-list-heading">
 					<div>
 						<h2>
@@ -375,10 +431,11 @@ export default function SubscriptionsPage() {
 				</div>
 				<div className="subscription-toolbar">
 					<GlassSegmented
-						intensity={reducedMotion ? 1 : 3}
 						aria-label={label("statusFilter")}
 						value={filter}
 						onChange={setFilter}
+						size="sm"
+						intensity={1}
 						options={["all", "active", "upcoming", "ended"].map((key) => label(`filters.${key}`))}
 					/>
 					<div className="subscription-search-controls">
@@ -429,13 +486,7 @@ export default function SubscriptionsPage() {
 						)}
 					</div>
 				) : !mobile ? (
-					<Table<Subscription>
-						rowKey="id"
-						dataSource={visible}
-						columns={columns}
-						scroll={{ x: 1035 }}
-						pagination={{ pageSize: 10, hideOnSinglePage: true, showSizeChanger: false }}
-					/>
+					<SubscriptionTable items={visible} columns={columns} />
 				) : (
 					<div className="subscription-mobile-list">
 						{visible.map((item) => (
@@ -467,7 +518,7 @@ export default function SubscriptionsPage() {
 					<span>{label("originalPriceHint")}</span>
 					<span>{label("timezone")}</span>
 				</div>
-			</GlassPanel>
+			</Card>
 			<SubscriptionForm
 				open={formOpen}
 				item={editing}

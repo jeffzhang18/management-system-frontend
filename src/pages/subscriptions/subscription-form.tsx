@@ -127,8 +127,15 @@ export function SubscriptionForm({
 	const title = item ? label("edit") : label("add");
 	const contents = (
 		<ConfigProvider getPopupContainer={() => containerRef.current ?? document.body}>
-			<div ref={containerRef} className="subscription-form-body">
-				<Form form={form} layout="vertical" onFinish={submit} disabled={saving} requiredMark={false}>
+			<Form
+				className="subscription-form"
+				form={form}
+				layout="vertical"
+				onFinish={submit}
+				disabled={saving}
+				requiredMark={false}
+			>
+				<div ref={containerRef} className="subscription-form-body">
 					<Form.Item
 						name="name"
 						label={label("name")}
@@ -228,16 +235,16 @@ export function SubscriptionForm({
 							</Form.Item>
 						</div>
 					)}
-					<div className="subscription-form-footer">
-						<Button type="button" variant="outline" disabled={saving} onClick={onClose}>
-							{label("cancel")}
-						</Button>
-						<GlassAction type="submit" variant="filled" disabled={saving}>
-							{label(saving ? "saving" : "save")}
-						</GlassAction>
-					</div>
-				</Form>
-			</div>
+				</div>
+				<div className="subscription-form-footer">
+					<Button type="button" variant="outline" disabled={saving} onClick={onClose}>
+						{label("cancel")}
+					</Button>
+					<GlassAction type="submit" variant="filled" disabled={saving}>
+						{label(saving ? "saving" : "save")}
+					</GlassAction>
+				</div>
+			</Form>
 		</ConfigProvider>
 	);
 	const changeOpen = (value: boolean) => {
@@ -259,8 +266,10 @@ export function SubscriptionForm({
 						if (saving) event.preventDefault();
 					}}
 				>
-					<SheetTitle>{title}</SheetTitle>
-					<SheetDescription>{label("formDescription")}</SheetDescription>
+					<div className="subscription-modal-header">
+						<SheetTitle>{title}</SheetTitle>
+						<SheetDescription>{label("formDescription")}</SheetDescription>
+					</div>
 					{contents}
 				</SheetContent>
 			</Sheet>
@@ -275,8 +284,10 @@ export function SubscriptionForm({
 					if (saving) event.preventDefault();
 				}}
 			>
-				<DialogTitle>{title}</DialogTitle>
-				<DialogDescription>{label("formDescription")}</DialogDescription>
+				<div className="subscription-modal-header">
+					<DialogTitle>{title}</DialogTitle>
+					<DialogDescription>{label("formDescription")}</DialogDescription>
+				</div>
 				{contents}
 			</DialogContent>
 		</Dialog>

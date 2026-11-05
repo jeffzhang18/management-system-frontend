@@ -1,0 +1,2 @@
+patchedDependencies:
+  '@zakisheriff/liquid-glass@0.3.20': patches/@zakisheriff__liquid-glass@0.3.20.patch
