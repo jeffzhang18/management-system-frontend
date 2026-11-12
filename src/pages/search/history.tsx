@@ -1,220 +1,129 @@
-import { useEffect, useRef, useState } from "react";
-import searchService, { type Bookmark, type BookmarkInput } from "@/api/services/searchService";
-import { GlassAction } from "../subscriptions/glass";
-import { errorMessage, metadataCurrent, safeIcon, validUrl } from "./logic";
-import { OnlineImage, SearchSheet, useLabels } from "./shared";
-export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close: () => void; saved: () => void }) {
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { Search, Trash2 } from "lucide-react";
+import { useState } from "react";
+import searchService, { type Engine, type SearchHistory } from "@/api/services/searchService";
+import { SearchSheet, useLabels } from "./shared";
+
+export function History({
+	userId,
+	close,
+	search,
+}: {
+	userId?: string;
+	close: () => void;
+	search: (item: SearchHistory) => void;
+}) {
 	const l = useLabels();
-	const [form, setForm] = useState<BookmarkInput>({
-		name: item?.name || "",
-		url: item?.url || "",
-		titleSource: item?.titleSource || "auto",
-		iconSource: item?.iconSource || "auto",
-		iconUrl: item?.iconUrl || null,
-		metadataFetchedAt: item?.metadataFetchedAt || null,
+	const client = useQueryClient();
+	const queryKey = ["search", userId, "history"];
+	const history = useInfiniteQuery({
+		queryKey,
+		queryFn: ({ pageParam }) => searchService.history(pageParam),
+		initialPageParam: undefined as string | undefined,
+		getNextPageParam: (page) => page.nextCursor ?? undefined,
+		retry: false,
 	});
-	const current = useRef(form);
-	current.current = form;
 	const [busy, setBusy] = useState(false);
-	const [fetching, setFetching] = useState(false);
+	const [confirming, setConfirming] = useState(false);
 	const [error, setError] = useState("");
-	const [preview, setPreview] = useState("");
-	const [verified, setVerified] = useState("");
-	const sequence = useRef(0);
-	const controller = useRef<AbortController | null>(null);
-	useEffect(
-		() => () => {
-			sequence.current++;
-			controller.current?.abort();
-		},
-		[],
-	);
-	const patch = (data: Partial<BookmarkInput>) => setForm((f) => ({ ...f, ...data }));
-	const metadata = async () => {
-		const url = validUrl(current.current.url);
-		if (!url) {
-			setError(l("invalidUrl"));
-			return;
-		}
-		controller.current?.abort();
-		const abort = new AbortController();
-		controller.current = abort;
-		const seq = ++sequence.current;
-		const raw = current.current.url;
-		setFetching(true);
-		setError("");
-		try {
-			const result = await searchService.metadata(url, abort.signal);
-			if (!metadataCurrent(seq, sequence.current, raw, current.current.url)) return;
-			setForm((f) => ({
-				...f,
-				name: f.titleSource === "auto" ? (result.title || new URL(url).hostname).slice(0, 80) : f.name,
-				iconUrl: f.iconSource === "auto" ? safeIcon(result.iconUrl) : f.iconUrl,
-				metadataFetchedAt: result.fetchedAt,
-			}));
-			if (result.status !== "ok") setError(l("metadataFailed"));
-		} catch {
-			if (!abort.signal.aborted && seq === sequence.current) setError(l("metadataFailed"));
-		} finally {
-			if (seq === sequence.current) setFetching(false);
-		}
-	};
-	const save = async () => {
-		const url = validUrl(form.url);
-		if (!url || !form.name.trim() || form.name.trim().length > 80) {
-			setError(l("bookmarkInvalid"));
-			return;
-		}
-		if (
-			form.iconSource === "custom" &&
-			form.iconUrl &&
-			(form.iconUrl !== item?.iconUrl || item?.iconSource !== "custom") &&
-			(verified !== form.iconUrl || !validUrl(form.iconUrl, true))
-		) {
-			setError(l("verifyImage"));
-			return;
-		}
+	const engines: Record<Engine, string> = { google: "Google", baidu: l("baidu"), bing: "Bing" };
+	const run = async (operation: () => Promise<unknown>) => {
+		if (busy) return;
 		setBusy(true);
 		setError("");
 		try {
-			const data = { ...form, url, name: form.name.trim() };
-			if (item) await searchService.updateBookmark(item.id, { ...data, version: item.version });
-			else await searchService.createBookmark(data);
-			saved();
-		} catch (e) {
-			setError(errorMessage(e, l("saveFailed"), l("conflict")));
+			await operation();
+			setConfirming(false);
+			await client.invalidateQueries({ queryKey });
+		} catch {
+			setError(l("saveFailed"));
 		} finally {
 			setBusy(false);
 		}
 	};
+	const items = history.data?.pages.flatMap((page) => page.items) ?? [];
 	return (
-		<SearchSheet title={item ? l("editBookmark") : l("addBookmark")} close={() => !busy && close()}>
-			<div className="search-fields">
-				<label>
-					{l("website")}
-					<input
-						autoFocus
-						type="url"
-						maxLength={2048}
-						value={form.url}
-						placeholder="https://example.com"
-						onChange={(e) => {
-							sequence.current++;
-							controller.current?.abort();
-							setFetching(false);
-							patch({
-								url: e.target.value,
-								metadataFetchedAt: null,
-								...(form.iconSource === "auto" ? { iconUrl: null } : {}),
-								...(form.titleSource === "auto" ? { name: "" } : {}),
-							});
-						}}
-						onBlur={metadata}
-					/>
-				</label>
-				<button type="button" disabled={fetching} onClick={metadata}>
-					{fetching ? l("fetching") : l("fetchMetadata")}
+		<SearchSheet title={l("history")} close={() => !busy && close()}>
+			<p className="search-help">{l("historyHelp")}</p>
+			{history.isPending ? (
+				<p role="status" className="search-empty">
+					{l("loading")}
+				</p>
+			) : history.isError ? (
+				<div role="alert" className="search-error">
+					{l("loadFailed")}{" "}
+					<button type="button" onClick={() => history.refetch()}>
+						{l("retry")}
+					</button>
+				</div>
+			) : !items.length ? (
+				<p className="search-empty">{l("emptyHistory")}</p>
+			) : (
+				<ul className="search-history">
+					{items.map((item) => (
+						<li key={item.id} className="search-history-item">
+							<div className="search-history-text">
+								<strong>{item.query}</strong>
+								<span>
+									{engines[item.engine] ?? item.engine} · {new Date(item.createdAt).toLocaleString()}
+								</span>
+							</div>
+							<button
+								type="button"
+								disabled={busy}
+								title={l("searchAgain")}
+								aria-label={`${l("searchAgain")} ${item.query}`}
+								onClick={() => search(item)}
+							>
+								<Search size={16} />
+							</button>
+							<button
+								type="button"
+								disabled={busy}
+								title={l("delete")}
+								aria-label={`${l("delete")} ${item.query}`}
+								onClick={() => run(() => searchService.deleteHistory(item.id))}
+							>
+								<Trash2 size={16} />
+							</button>
+						</li>
+					))}
+				</ul>
+			)}
+			{history.hasNextPage && (
+				<button
+					type="button"
+					className="search-load-more"
+					disabled={history.isFetchingNextPage}
+					onClick={() => history.fetchNextPage()}
+				>
+					{history.isFetchingNextPage ? l("loading") : l("loadMore")}
 				</button>
-				<label>
-					{l("name")}
-					<input
-						maxLength={80}
-						value={form.name}
-						onChange={(e) => patch({ name: e.target.value, titleSource: "custom" })}
-					/>
-				</label>
-				<label className="search-check">
-					<input
-						type="checkbox"
-						checked={form.titleSource === "auto"}
-						onChange={(e) => {
-							patch({ titleSource: e.target.checked ? "auto" : "custom" });
-						}}
-					/>
-					{l("autoTitle")}
-				</label>
-				<label>
-					{l("icon")}
-					<select
-						value={form.iconSource}
-						onChange={(e) => {
-							patch({ iconSource: e.target.value as "auto" | "custom", iconUrl: null });
-							setVerified("");
-							setPreview("");
-						}}
-					>
-						<option value="auto">{l("autoIcon")}</option>
-						<option value="custom">{l("customIcon")}</option>
-					</select>
-				</label>
-				{form.iconSource === "custom" && (
-					<>
-						<label>
-							{l("imageUrl")}
-							<input
-								type="url"
-								maxLength={2048}
-								value={form.iconUrl || ""}
-								placeholder="https://…"
-								onChange={(e) => {
-									patch({ iconUrl: e.target.value || null });
-									setVerified("");
-									setPreview("");
-								}}
-							/>
-						</label>
-						<button
-							type="button"
-							onClick={() => {
-								if (!validUrl(form.iconUrl || "", true)) {
-									setError(l("invalidImage"));
-									return;
-								}
-								setError("");
-								setPreview(form.iconUrl!);
-							}}
-						>
-							{l("preview")}
-						</button>
-						<button
-							type="button"
-							onClick={() => {
-								patch({ iconUrl: null });
-								setPreview("");
-							}}
-						>
-							{l("removeImage")}
-						</button>
-					</>
-				)}
-				{(preview || (form.iconSource === "auto" && safeIcon(form.iconUrl))) && (
-					<OnlineImage
-						key={preview || form.iconUrl}
-						url={preview || safeIcon(form.iconUrl)!}
-						alt={form.name || l("icon")}
-						className="search-icon-preview"
-						onResult={(ok) => {
-							if (preview) {
-								setVerified(ok ? preview : "");
-								if (!ok) setError(l("imageFailed"));
-							}
-						}}
-					/>
-				)}
-			</div>
+			)}
 			{error && (
 				<p role="alert" className="search-error">
 					{error}
 				</p>
 			)}
-			<div className="search-footer">
-				<button disabled={busy} onClick={close}>
-					{l("cancel")}
-				</button>
-				<GlassAction disabled={busy} onClick={save}>
-					{busy ? l("saving") : l("save")}
-				</GlassAction>
-			</div>
+			{items.length > 0 && (
+				<div className="search-footer">
+					{confirming ? (
+						<>
+							<p className="search-help">{l("confirmClear")}</p>
+							<button type="button" disabled={busy} onClick={() => setConfirming(false)}>
+								{l("cancel")}
+							</button>
+							<button type="button" disabled={busy} onClick={() => run(() => searchService.clearHistory())}>
+								{l("confirm")}
+							</button>
+						</>
+					) : (
+						<button type="button" disabled={busy} onClick={() => setConfirming(true)}>
+							{l("clearHistory")}
+						</button>
+					)}
+				</div>
+			)}
 		</SearchSheet>
 	);
 }

@@ -1,220 +1,174 @@
-import { useEffect, useRef, useState } from "react";
-import searchService, { type Bookmark, type BookmarkInput } from "@/api/services/searchService";
-import { GlassAction } from "../subscriptions/glass";
-import { errorMessage, metadataCurrent, safeIcon, validUrl } from "./logic";
-import { OnlineImage, SearchSheet, useLabels } from "./shared";
-export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close: () => void; saved: () => void }) {
-	const l = useLabels();
-	const [form, setForm] = useState<BookmarkInput>({
-		name: item?.name || "",
-		url: item?.url || "",
-		titleSource: item?.titleSource || "auto",
-		iconSource: item?.iconSource || "auto",
-		iconUrl: item?.iconUrl || null,
-		metadataFetchedAt: item?.metadataFetchedAt || null,
-	});
-	const current = useRef(form);
-	current.current = form;
-	const [busy, setBusy] = useState(false);
-	const [fetching, setFetching] = useState(false);
-	const [error, setError] = useState("");
-	const [preview, setPreview] = useState("");
-	const [verified, setVerified] = useState("");
-	const sequence = useRef(0);
-	const controller = useRef<AbortController | null>(null);
-	useEffect(
-		() => () => {
-			sequence.current++;
-			controller.current?.abort();
-		},
-		[],
+import {
+	closestCenter,
+	DndContext,
+	type DragEndEvent,
+	KeyboardSensor,
+	PointerSensor,
+	useSensor,
+	useSensors,
+} from "@dnd-kit/core";
+import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import type { CSSProperties } from "react";
+import type { Bookmark, SearchSettings } from "@/api/services/searchService";
+import { safeIcon, validUrl } from "./logic";
+import { OnlineImage, useLabels } from "./shared";
+
+function Icon({ item }: { item: Bookmark }) {
+	const icon = safeIcon(item.iconUrl);
+	return icon ? (
+		<OnlineImage key={icon} url={icon} alt={item.name} className="search-bookmark-icon" />
+	) : (
+		<span className="search-bookmark-icon" aria-hidden="true">
+			{item.name.slice(0, 1).toUpperCase()}
+		</span>
 	);
-	const patch = (data: Partial<BookmarkInput>) => setForm((f) => ({ ...f, ...data }));
-	const metadata = async () => {
-		const url = validUrl(current.current.url);
-		if (!url) {
-			setError(l("invalidUrl"));
-			return;
-		}
-		controller.current?.abort();
-		const abort = new AbortController();
-		controller.current = abort;
-		const seq = ++sequence.current;
-		const raw = current.current.url;
-		setFetching(true);
-		setError("");
-		try {
-			const result = await searchService.metadata(url, abort.signal);
-			if (!metadataCurrent(seq, sequence.current, raw, current.current.url)) return;
-			setForm((f) => ({
-				...f,
-				name: f.titleSource === "auto" ? (result.title || new URL(url).hostname).slice(0, 80) : f.name,
-				iconUrl: f.iconSource === "auto" ? safeIcon(result.iconUrl) : f.iconUrl,
-				metadataFetchedAt: result.fetchedAt,
-			}));
-			if (result.status !== "ok") setError(l("metadataFailed"));
-		} catch {
-			if (!abort.signal.aborted && seq === sequence.current) setError(l("metadataFailed"));
-		} finally {
-			if (seq === sequence.current) setFetching(false);
-		}
-	};
-	const save = async () => {
-		const url = validUrl(form.url);
-		if (!url || !form.name.trim() || form.name.trim().length > 80) {
-			setError(l("bookmarkInvalid"));
-			return;
-		}
-		if (
-			form.iconSource === "custom" &&
-			form.iconUrl &&
-			(form.iconUrl !== item?.iconUrl || item?.iconSource !== "custom") &&
-			(verified !== form.iconUrl || !validUrl(form.iconUrl, true))
-		) {
-			setError(l("verifyImage"));
-			return;
-		}
-		setBusy(true);
-		setError("");
-		try {
-			const data = { ...form, url, name: form.name.trim() };
-			if (item) await searchService.updateBookmark(item.id, { ...data, version: item.version });
-			else await searchService.createBookmark(data);
-			saved();
-		} catch (e) {
-			setError(errorMessage(e, l("saveFailed"), l("conflict")));
-		} finally {
-			setBusy(false);
-		}
-	};
+}
+
+function SortableBookmark({
+	item,
+	editing,
+	busy,
+	newTab,
+	edit,
+	remove,
+}: {
+	item: Bookmark;
+	editing: boolean;
+	busy: boolean;
+	newTab: boolean;
+	edit: (item: Bookmark) => void;
+	remove: (item: Bookmark) => void;
+}) {
+	const l = useLabels();
+	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+		id: item.id,
+		disabled: !editing || busy,
+	});
+	const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
+	const href = validUrl(item.url);
 	return (
-		<SearchSheet title={item ? l("editBookmark") : l("addBookmark")} close={() => !busy && close()}>
-			<div className="search-fields">
-				<label>
-					{l("website")}
-					<input
-						autoFocus
-						type="url"
-						maxLength={2048}
-						value={form.url}
-						placeholder="https://example.com"
-						onChange={(e) => {
-							sequence.current++;
-							controller.current?.abort();
-							setFetching(false);
-							patch({
-								url: e.target.value,
-								metadataFetchedAt: null,
-								...(form.iconSource === "auto" ? { iconUrl: null } : {}),
-								...(form.titleSource === "auto" ? { name: "" } : {}),
-							});
-						}}
-						onBlur={metadata}
-					/>
-				</label>
-				<button type="button" disabled={fetching} onClick={metadata}>
-					{fetching ? l("fetching") : l("fetchMetadata")}
-				</button>
-				<label>
-					{l("name")}
-					<input
-						maxLength={80}
-						value={form.name}
-						onChange={(e) => patch({ name: e.target.value, titleSource: "custom" })}
-					/>
-				</label>
-				<label className="search-check">
-					<input
-						type="checkbox"
-						checked={form.titleSource === "auto"}
-						onChange={(e) => {
-							patch({ titleSource: e.target.checked ? "auto" : "custom" });
-						}}
-					/>
-					{l("autoTitle")}
-				</label>
-				<label>
-					{l("icon")}
-					<select
-						value={form.iconSource}
-						onChange={(e) => {
-							patch({ iconSource: e.target.value as "auto" | "custom", iconUrl: null });
-							setVerified("");
-							setPreview("");
-						}}
-					>
-						<option value="auto">{l("autoIcon")}</option>
-						<option value="custom">{l("customIcon")}</option>
-					</select>
-				</label>
-				{form.iconSource === "custom" && (
-					<>
-						<label>
-							{l("imageUrl")}
-							<input
-								type="url"
-								maxLength={2048}
-								value={form.iconUrl || ""}
-								placeholder="https://…"
-								onChange={(e) => {
-									patch({ iconUrl: e.target.value || null });
-									setVerified("");
-									setPreview("");
-								}}
-							/>
-						</label>
-						<button
-							type="button"
-							onClick={() => {
-								if (!validUrl(form.iconUrl || "", true)) {
-									setError(l("invalidImage"));
-									return;
-								}
-								setError("");
-								setPreview(form.iconUrl!);
-							}}
-						>
-							{l("preview")}
-						</button>
-						<button
-							type="button"
-							onClick={() => {
-								patch({ iconUrl: null });
-								setPreview("");
-							}}
-						>
-							{l("removeImage")}
-						</button>
-					</>
-				)}
-				{(preview || (form.iconSource === "auto" && safeIcon(form.iconUrl))) && (
-					<OnlineImage
-						key={preview || form.iconUrl}
-						url={preview || safeIcon(form.iconUrl)!}
-						alt={form.name || l("icon")}
-						className="search-icon-preview"
-						onResult={(ok) => {
-							if (preview) {
-								setVerified(ok ? preview : "");
-								if (!ok) setError(l("imageFailed"));
-							}
-						}}
-					/>
-				)}
-			</div>
-			{error && (
-				<p role="alert" className="search-error">
-					{error}
-				</p>
+		<li ref={setNodeRef} style={style} className={`search-bookmark${isDragging ? " is-dragging" : ""}`}>
+			{editing || !href ? (
+				<div className="search-bookmark-link">
+					<Icon item={item} />
+					<span className="search-bookmark-name">{item.name}</span>
+				</div>
+			) : (
+				<a
+					className="search-bookmark-link"
+					href={href}
+					target={newTab ? "_blank" : undefined}
+					rel="noopener noreferrer"
+					title={item.name}
+				>
+					<Icon item={item} />
+					<span className="search-bookmark-name">{item.name}</span>
+				</a>
 			)}
-			<div className="search-footer">
-				<button disabled={busy} onClick={close}>
-					{l("cancel")}
-				</button>
-				<GlassAction disabled={busy} onClick={save}>
-					{busy ? l("saving") : l("save")}
-				</GlassAction>
-			</div>
-		</SearchSheet>
+			{editing && (
+				<div className="search-bookmark-actions">
+					<button
+						type="button"
+						className="search-bookmark-handle"
+						disabled={busy}
+						title={l("reorder")}
+						aria-label={`${l("reorder")} ${item.name}`}
+						{...attributes}
+						{...listeners}
+					>
+						<GripVertical size={16} />
+					</button>
+					<button
+						type="button"
+						disabled={busy}
+						title={l("editBookmark")}
+						aria-label={`${l("editBookmark")} ${item.name}`}
+						onClick={() => edit(item)}
+					>
+						<Pencil size={15} />
+					</button>
+					<button
+						type="button"
+						disabled={busy}
+						title={l("delete")}
+						aria-label={`${l("delete")} ${item.name}`}
+						onClick={() => remove(item)}
+					>
+						<Trash2 size={15} />
+					</button>
+				</div>
+			)}
+		</li>
+	);
+}
+
+export function Bookmarks({
+	items,
+	settings,
+	editing,
+	edit,
+	add,
+	busy,
+	remove,
+	reorder,
+}: {
+	items: Bookmark[];
+	settings: SearchSettings;
+	editing: boolean;
+	edit: (item: Bookmark) => void;
+	add: () => void;
+	busy: boolean;
+	remove: (item: Bookmark) => void;
+	reorder: (from: number, to: number) => void;
+}) {
+	const l = useLabels();
+	const sensors = useSensors(
+		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+		useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+	);
+	const onDragEnd = ({ active, over }: DragEndEvent) => {
+		if (!over || active.id === over.id) return;
+		const from = items.findIndex((item) => item.id === active.id);
+		const to = items.findIndex((item) => item.id === over.id);
+		if (from >= 0 && to >= 0) reorder(from, to);
+	};
+	const style = {
+		"--search-icon": `${settings.iconSize}px`,
+		"--search-gap": `${settings.gap}px`,
+		"--search-radius": `${settings.radius}px`,
+		"--search-count": settings.itemsPerLine,
+	} as CSSProperties;
+	return (
+		<div className="search-bookmarks-wrap">
+			{!items.length && <p className="search-empty">{l("emptyBookmarks")}</p>}
+			{editing && items.length > 1 && <p className="search-help search-sort-help">{l("sortHelp")}</p>}
+			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+				<SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
+					<ul className={`search-bookmarks search-bookmarks-${settings.layoutDirection}`} style={style}>
+						{items.map((item) => (
+							<SortableBookmark
+								key={item.id}
+								item={item}
+								editing={editing}
+								busy={busy}
+								newTab={settings.openInNewTab}
+								edit={edit}
+								remove={remove}
+							/>
+						))}
+						<li className="search-bookmark">
+							<button type="button" className="search-bookmark-link" disabled={busy} onClick={add}>
+								<span className="search-bookmark-icon search-bookmark-add" aria-hidden="true">
+									<Plus size={24} />
+								</span>
+								<span className="search-bookmark-name">{l("addBookmark")}</span>
+							</button>
+						</li>
+					</ul>
+				</SortableContext>
+			</DndContext>
+		</div>
 	);
 }

@@ -1,287 +1,446 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock3, Pencil, Search, Settings2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import searchService, { type Bookmark, type Engine, type SearchSettings } from "@/api/services/searchService";
-import { useUserInfo } from "@/store/userStore";
-import { GlassAction, GlassPanel } from "../subscriptions/glass";
-import { BookmarkEditor } from "./bookmark-editor";
-import { Bookmarks } from "./bookmarks";
-import { History } from "./history";
-import { canSubmit, defaults, move, SearchAttempt, validUrl } from "./logic";
-import { OnlineImage, useLabels } from "./shared";
-import { Settings } from "./settings";
-import { recordThenNavigate } from "./submission";
-import "./search.css";
-export default function SearchPage() {
-	const user = useUserInfo();
-	return <SearchContent key={user.id} userId={user.id} />;
+.search-page {
+	position: relative;
+	min-height: calc(100dvh - 120px);
+	overflow: hidden;
+	border-radius: 16px;
+	color: #fff;
+	background: linear-gradient(135deg, #1e3a8a 0%, #6d28d9 50%, #db2777 100%);
 }
-function SearchContent({ userId }: { userId?: string }) {
-	const l = useLabels();
-	const client = useQueryClient();
-	const key = ["search", userId];
-	const settings = useQuery({ queryKey: [...key, "settings"], queryFn: searchService.settings, retry: false });
-	const bookmarks = useQuery({ queryKey: [...key, "bookmarks"], queryFn: searchService.bookmarks, retry: false });
-	const [draft, setDraft] = useState<SearchSettings | null>(null);
-	const effective = draft || settings.data || defaults;
-	const [query, setQuery] = useState("");
-	const [engine, setEngine] = useState<Engine>("google");
-	const [editing, setEditing] = useState(false);
-	const [editor, setEditor] = useState<Bookmark | "new" | null>(null);
-	const [history, setHistory] = useState(false);
-	const [pending, setPending] = useState(false);
-	const [mutation, setMutation] = useState(false);
-	const [error, setError] = useState("");
-	const [searchFailed, setSearchFailed] = useState(false);
-	const [fallback, setFallback] = useState("");
-	const [deleteItem, setDeleteItem] = useState<Bookmark | null>(null);
-	const composing = useRef(false);
-	const submitting = useRef(false);
-	const attempts = useRef(new SearchAttempt());
-	const input = useRef<HTMLInputElement>(null);
-	const alive = useRef(true);
-	const reserved = useRef<Window | null>(null);
-	useEffect(() => {
-		alive.current = true;
-		return () => {
-			alive.current = false;
-			reserved.current?.close();
-		};
-	}, []);
-	useEffect(() => {
-		if (settings.data) setEngine(settings.data.defaultEngine);
-	}, [settings.data?.defaultEngine]);
-	const submit = async (text = query, selected = engine, retry = false) => {
-		if (!canSubmit(text, composing.current, submitting.current)) return;
-		const q = text.trim();
-		const requestId = attempts.current.get(q, selected, retry, () => crypto.randomUUID());
-		submitting.current = true;
-		setPending(true);
-		setError("");
-		setFallback("");
-		setSearchFailed(false);
-		const popup = effective.openInNewTab ? window.open("about:blank", "_blank") : null;
-		reserved.current = popup;
-		if (popup) popup.opener = null;
-		try {
-			const target = await recordThenNavigate({
-				record: () => searchService.search(q, selected, requestId),
-				popup,
-				newTab: effective.openInNewTab,
-				navigate: (url) => window.location.assign(url),
-				active: () => alive.current,
-			});
-			if (alive.current) {
-				client.invalidateQueries({ queryKey: [...key, "history"] });
-				if (target) setFallback(target);
-			}
-		} catch {
-			popup?.close();
-			if (alive.current) {
-				setError(l("searchFailed"));
-				setSearchFailed(true);
-			}
-		} finally {
-			reserved.current = null;
-			submitting.current = false;
-			if (alive.current) setPending(false);
-		}
-	};
-	const mutate = async (operation: () => Promise<unknown>) => {
-		if (mutation) return;
-		setMutation(true);
-		setError("");
-		try {
-			await operation();
-			await client.invalidateQueries({ queryKey: [...key, "bookmarks"] });
-			setDeleteItem(null);
-		} catch {
-			setError(l("saveFailed"));
-		} finally {
-			setMutation(false);
-		}
-	};
-	const items = bookmarks.data?.items || [];
-	return (
-		<section className="search-page" aria-label={l("pageTitle")}>
-			{effective.backgroundMode === "online" && effective.wallpaperUrl && validUrl(effective.wallpaperUrl, true) && (
-				<OnlineImage key={effective.wallpaperUrl} url={effective.wallpaperUrl} alt="" className="search-wallpaper" />
-			)}
-			<div className="search-shade" style={{ opacity: effective.overlayOpacity }} />
-			<div className="search-content">
-				<div className="search-toolbar">
-					<button title={l("history")} aria-label={l("history")} onClick={() => setHistory(true)}>
-						<Clock3 size={20} />
-					</button>
-					<button
-						title={l("editBookmarks")}
-						aria-label={l("editBookmarks")}
-						aria-pressed={editing}
-						onClick={() => setEditing(!editing)}
-					>
-						<Pencil size={19} />
-					</button>
-					<button
-						disabled={!settings.data}
-						title={l("settings")}
-						aria-label={l("settings")}
-						onClick={() => setDraft({ ...settings.data! })}
-					>
-						<Settings2 size={20} />
-					</button>
-				</div>
-				<div className="search-top">
-					<h1 className="sr-only">{l("pageTitle")}</h1>
-					<GlassPanel className="search-bar" padding="0" radius="24px">
-						<form
-							onSubmit={(e) => {
-								e.preventDefault();
-								submit();
-							}}
-						>
-							<select
-								aria-label={l("engine")}
-								value={engine}
-								disabled={pending}
-								onChange={(e) => {
-									setEngine(e.target.value as Engine);
-									setSearchFailed(false);
-								}}
-							>
-								<option value="google">Google</option>
-								<option value="baidu">{l("baidu")}</option>
-								<option value="bing">Bing</option>
-							</select>
-							<input
-								ref={input}
-								aria-label={l("query")}
-								placeholder={l("placeholder")}
-								value={query}
-								maxLength={1000}
-								disabled={pending}
-								onChange={(e) => {
-									setQuery(e.target.value);
-									setSearchFailed(false);
-								}}
-								onCompositionStart={() => {
-									composing.current = true;
-								}}
-								onCompositionEnd={() => {
-									composing.current = false;
-								}}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" && (e.nativeEvent.isComposing || composing.current || e.keyCode === 229))
-										e.preventDefault();
-								}}
-							/>
-							<GlassAction type="submit" disabled={pending || !query.trim()} aria-label={l("search")}>
-								<Search size={21} />
-								<span className="search-submit-label">{pending ? l("saving") : l("search")}</span>
-							</GlassAction>
-						</form>
-					</GlassPanel>
-				</div>
-				{error && (
-					<div role="alert" className="search-status search-error">
-						{error}
-						{searchFailed && (
-							<button disabled={pending} onClick={() => submit(query, engine, true)}>
-								{l("retry")}
-							</button>
-						)}
-					</div>
-				)}
-				{fallback && (
-					<div role="status" className="search-status">
-						{l("popupBlocked")}{" "}
-						<a href={fallback} target="_blank" rel="noopener noreferrer">
-							{l("openResults")}
-						</a>
-					</div>
-				)}
-				{(settings.isError || bookmarks.isError) && (
-					<div className="search-status" role="alert">
-						{l("loadFailed")}
-						<button
-							onClick={() => {
-								settings.refetch();
-								bookmarks.refetch();
-							}}
-						>
-							{l("retry")}
-						</button>
-					</div>
-				)}
-				{bookmarks.isPending ? (
-					<p role="status" className="search-empty">
-						{l("loading")}
-					</p>
-				) : (
-					<Bookmarks
-						items={items}
-						settings={effective}
-						editing={editing}
-						edit={setEditor}
-						add={() => setEditor("new")}
-						busy={mutation}
-						remove={setDeleteItem}
-						reorder={(from, to) => mutate(() => searchService.order(move(items, from, to).map((i) => i.id)))}
-					/>
-				)}
-				{deleteItem && (
-					<div className="search-status search-confirm" role="alert">
-						<p>
-							{l("confirmDelete")} {deleteItem.name}
-						</p>
-						<button disabled={mutation} onClick={() => mutate(() => searchService.deleteBookmark(deleteItem.id))}>
-							{l("delete")}
-						</button>
-						<button disabled={mutation} onClick={() => setDeleteItem(null)}>
-							{l("cancel")}
-						</button>
-					</div>
-				)}
-			</div>
-			{draft && settings.data && (
-				<Settings
-					saved={settings.data}
-					draft={draft}
-					setDraft={setDraft}
-					close={() => {
-						setDraft(null);
-						settings.refetch();
-					}}
-					onSaved={(saved) => {
-						client.setQueryData([...key, "settings"], saved);
-						setDraft(null);
-					}}
-				/>
-			)}
-			{editor && (
-				<BookmarkEditor
-					item={editor === "new" ? undefined : editor}
-					close={() => {
-						setEditor(null);
-						bookmarks.refetch();
-					}}
-					saved={() => {
-						client.invalidateQueries({ queryKey: [...key, "bookmarks"] });
-						setEditor(null);
-					}}
-				/>
-			)}
-			{history && (
-				<History
-					userId={userId}
-					close={() => setHistory(false)}
-					search={(item) => {
-						setQuery(item.query);
-						setEngine(item.engine);
-						setHistory(false);
-						submit(item.query, item.engine);
-					}}
-				/>
-			)}
-		</section>
-	);
+
+.search-wallpaper,
+.search-shade {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.search-wallpaper {
+	object-fit: cover;
+}
+
+.search-shade {
+	background: #000;
+	pointer-events: none;
+}
+
+.search-content {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 24px;
+	padding: 16px 24px 48px;
+}
+
+.search-toolbar {
+	display: flex;
+	align-self: flex-end;
+	gap: 8px;
+}
+
+.search-toolbar button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	border-radius: 999px;
+	color: inherit;
+	background: rgb(255 255 255 / 0.14);
+	transition: background 0.2s;
+}
+
+.search-toolbar button:hover:not(:disabled),
+.search-toolbar button[aria-pressed="true"] {
+	background: rgb(255 255 255 / 0.3);
+}
+
+.search-toolbar button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.search-top {
+	display: flex;
+	justify-content: center;
+	width: 100%;
+	margin-top: 8vh;
+}
+
+.search-bar {
+	width: min(720px, 100%);
+}
+
+.search-bar form {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 6px 6px 6px 12px;
+}
+
+.search-bar select,
+.search-bar input {
+	min-width: 0;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	outline: none;
+}
+
+.search-bar select option {
+	color: #111;
+}
+
+.search-bar input {
+	flex: 1;
+	height: 44px;
+	font-size: 16px;
+}
+
+.search-bar input::placeholder {
+	color: rgb(255 255 255 / 0.7);
+}
+
+.search-bar :focus-visible,
+.search-toolbar button:focus-visible,
+.search-bookmark-link:focus-visible,
+.search-bookmark-actions button:focus-visible {
+	outline: 2px solid #fff;
+	outline-offset: 2px;
+}
+
+.search-status {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 12px;
+	max-width: min(720px, 100%);
+	padding: 10px 14px;
+	border-radius: 12px;
+	background: rgb(0 0 0 / 0.35);
+}
+
+.search-status a,
+.search-status button {
+	text-decoration: underline;
+	color: inherit;
+}
+
+.search-confirm p {
+	margin: 0;
+}
+
+.search-error {
+	color: #ef4444;
+}
+
+.search-status.search-error {
+	color: #fecaca;
+}
+
+.search-error button {
+	text-decoration: underline;
+}
+
+.search-empty {
+	text-align: center;
+	opacity: 0.8;
+}
+
+.search-bookmarks-wrap {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+}
+
+.search-bookmarks {
+	--search-cell: calc(var(--search-icon) + 24px);
+	display: grid;
+	gap: var(--search-gap);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.search-bookmarks-row {
+	grid-template-columns: repeat(var(--search-count), var(--search-cell));
+}
+
+.search-bookmarks-column {
+	grid-auto-flow: column;
+	grid-auto-columns: var(--search-cell);
+	grid-template-rows: repeat(var(--search-count), auto);
+}
+
+.search-bookmark {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	touch-action: manipulation;
+}
+
+.search-bookmark.is-dragging {
+	z-index: 2;
+	opacity: 0.8;
+}
+
+.search-bookmark-link {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	color: inherit;
+	text-decoration: none;
+	background: none;
+	border: 0;
+	cursor: pointer;
+}
+
+.search-bookmark-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: var(--search-icon);
+	height: var(--search-icon);
+	border-radius: var(--search-radius);
+	object-fit: cover;
+	font-size: calc(var(--search-icon) * 0.4);
+	font-weight: 600;
+	background: rgb(255 255 255 / 0.22);
+	box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
+	transition: transform 0.2s;
+}
+
+.search-bookmark-link:hover .search-bookmark-icon {
+	transform: translateY(-2px);
+}
+
+.search-bookmark-add {
+	border: 2px dashed rgb(255 255 255 / 0.6);
+	background: rgb(255 255 255 / 0.08);
+	box-shadow: none;
+}
+
+.search-bookmark-name {
+	max-width: 100%;
+	overflow: hidden;
+	font-size: 13px;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	text-shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+}
+
+.search-bookmark-actions {
+	display: flex;
+	gap: 4px;
+}
+
+.search-bookmark-actions button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: 8px;
+	color: inherit;
+	background: rgb(0 0 0 / 0.35);
+}
+
+.search-bookmark-handle {
+	cursor: grab;
+	touch-action: none;
+}
+
+.search-bookmark-actions button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.search-sort-help {
+	max-width: 560px;
+	text-align: center;
+	opacity: 0.85;
+}
+
+.search-sheet {
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.search-fields {
+	display: grid;
+	gap: 14px;
+}
+
+.search-fields label {
+	display: grid;
+	gap: 6px;
+	font-size: 14px;
+}
+
+.search-fields h3 {
+	margin: 4px 0 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.search-fields input:not([type="checkbox"]):not([type="range"]),
+.search-fields select {
+	height: 38px;
+	padding: 0 10px;
+	border: 1px solid var(--border, rgb(0 0 0 / 0.15));
+	border-radius: 8px;
+	background: transparent;
+}
+
+.search-fields > button,
+.search-footer button,
+.search-load-more,
+.search-history-item button {
+	padding: 6px 12px;
+	border: 1px solid var(--border, rgb(0 0 0 / 0.15));
+	border-radius: 8px;
+	background: transparent;
+}
+
+.search-fields > button:disabled,
+.search-footer button:disabled,
+.search-load-more:disabled,
+.search-history-item button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.search-fields label.search-check {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.search-help {
+	margin: 0;
+	font-size: 13px;
+	opacity: 0.75;
+}
+
+.search-icon-preview {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 64px;
+	height: 64px;
+	border-radius: 14px;
+	object-fit: cover;
+	background: rgb(0 0 0 / 0.06);
+}
+
+.search-image-preview {
+	width: 100%;
+	max-height: 180px;
+	border-radius: 10px;
+	object-fit: cover;
+}
+
+.search-footer {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.search-history {
+	display: grid;
+	gap: 8px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.search-history-item {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	border: 1px solid var(--border, rgb(0 0 0 / 0.12));
+	border-radius: 10px;
+}
+
+.search-history-item button {
+	display: inline-flex;
+	padding: 6px;
+}
+
+.search-history-text {
+	display: grid;
+	flex: 1;
+	min-width: 0;
+	gap: 2px;
+}
+
+.search-history-text strong {
+	overflow: hidden;
+	font-weight: 500;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.search-history-text span {
+	font-size: 12px;
+	opacity: 0.7;
+}
+
+.search-load-more {
+	align-self: center;
+}
+
+@media (max-width: 767px) {
+	.search-content {
+		padding: 12px 12px 32px;
+	}
+
+	.search-top {
+		margin-top: 4vh;
+	}
+
+	.search-submit-label {
+		display: none;
+	}
+
+	.search-bookmarks {
+		--search-icon-mobile: min(var(--search-icon), 56px);
+		--search-cell: calc(var(--search-icon-mobile) + 16px);
+		gap: min(var(--search-gap), 16px);
+		width: 100%;
+		justify-content: center;
+	}
+
+	.search-bookmarks-row,
+	.search-bookmarks-column {
+		grid-auto-flow: row;
+		grid-template-rows: none;
+		grid-template-columns: repeat(auto-fill, var(--search-cell));
+	}
+
+	.search-bookmark-icon {
+		width: var(--search-icon-mobile);
+		height: var(--search-icon-mobile);
+		border-radius: min(var(--search-radius), calc(var(--search-icon-mobile) / 2));
+		font-size: calc(var(--search-icon-mobile) * 0.4);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.search-bookmark-icon,
+	.search-toolbar button {
+		transition: none;
+	}
 }
