@@ -9,6 +9,7 @@ export function getFrontendDashboardRoutes(): RouteObject[] {
 		{ path: "analysis", element: Component("/pages/dashboard/analysis") },
 		{ path: "weather", element: Component("/pages/dashboard/weather") },
 		{ path: "subscriptions", element: Component("/pages/subscriptions") },
+		{ path: "search", element: Component("/pages/search") },
 		{
 			path: "components",
 			children: [

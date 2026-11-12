@@ -40,10 +40,10 @@ const Main = () => {
 				className={cn(
 					"flex-auto w-full flex flex-col",
 					"transition-[max-width] duration-300 ease-in-out",
-					"px-4 pt-[6px] pb-4 sm:px-6 sm:pt-[14px] sm:pb-6 md:px-8 mx-auto",
+					pathname === "/search" ? "p-0 max-w-full" : "px-4 pt-[6px] pb-4 sm:px-6 sm:pt-[14px] sm:pb-6 md:px-8 mx-auto",
 					{
 						"max-w-full": themeStretch,
-						"xl:max-w-screen-xl": !themeStretch,
+						"xl:max-w-screen-xl": !themeStretch && pathname !== "/search",
 					},
 				)}
 				style={{
