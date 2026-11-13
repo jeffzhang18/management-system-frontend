@@ -1,0 +1,9 @@
+{
+	"id": "/",
+	"name": "AGGREGATE",
+	"short_name": "AGGREGATE",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"background_color": "#ffffff"
+}

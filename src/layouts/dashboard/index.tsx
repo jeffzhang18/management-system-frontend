@@ -4,6 +4,7 @@ import { down, useMediaQuery } from "@/hooks";
 import { useSettings } from "@/store/settingStore";
 import Header from "./header";
 import Main from "./main";
+import { MobileBottomNav } from "./mobile-bottom-nav";
 import { NavHorizontalLayout, NavMobileLayout, NavVerticalLayout, useFilteredNavData } from "./nav";
 
 export default function DashboardLayout() {
@@ -32,6 +33,7 @@ export default function DashboardLayout() {
 				{isHorizontal && <NavHorizontalLayout data={navData} />}
 
 				<Main />
+				<MobileBottomNav />
 			</div>
 		</div>
 	);

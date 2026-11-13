@@ -7,6 +7,11 @@ export const frontendNavData: NavProps["data"] = [
 		name: "sys.nav.dashboard",
 		items: [
 			{
+				title: "sys.nav.search",
+				path: "/search",
+				icon: <Icon icon="solar:magnifer-bold-duotone" size="24" />,
+			},
+			{
 				title: "sys.nav.workbench",
 				path: "/workbench",
 				icon: <Icon icon="local:ic-workbench" size="24" />,
@@ -27,12 +32,7 @@ export const frontendNavData: NavProps["data"] = [
 				icon: <Icon icon="local:ic-weather" size="24" />,
 			},
 			{
-				title: "sys.nav.search",
-					path: "/search",
-					icon: <Icon icon="solar:magnifer-bold-duotone" size="24" />,
-				},
-				{
-					title: "sys.nav.subscriptions",
+				title: "sys.nav.subscriptions",
 				path: "/subscriptions",
 				icon: <Icon icon="solar:card-recive-bold-duotone" size="24" />,
 			},

@@ -70,6 +70,9 @@
 			"noAccount": "还没有账号？"
 		},
 		"nav": {
+			"mobileNavigation": "主导航",
+			"searchTab": "搜索",
+			"subscriptionsTab": "订阅",
 			"dashboard": "仪表盘",
 			"pages": "页面",
 			"others": "其他",

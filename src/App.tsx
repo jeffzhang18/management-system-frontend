@@ -5,6 +5,7 @@ import Logo from "@/assets/icons/ic-logo-badge.svg";
 import UserBrowsingTracker from "./components/analytics/user-browsing-tracker";
 import { MotionLazy } from "./components/animate/motion-lazy";
 import { RouteLoadingProgress } from "./components/loading";
+import StandaloneNavigation from "./components/standalone-navigation";
 import Toast from "./components/toast";
 import { GLOBAL_CONFIG } from "./global-config";
 import { AntdAdapter } from "./theme/adapter/antd.adapter";
@@ -34,6 +35,7 @@ function App({ children }: { children: React.ReactNode }) {
 						<link rel="icon" href={Logo} />
 					</Helmet>
 					<UserBrowsingTracker />
+					<StandaloneNavigation />
 					<Toast />
 					<RouteLoadingProgress />
 					<MotionLazy>{children}</MotionLazy>

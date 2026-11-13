@@ -79,7 +79,7 @@ function SearchContent({ userId }: { userId?: string }) {
 				active: () => alive.current,
 			});
 			if (alive.current) {
-				if (!incognito) client.invalidateQueries({ queryKey: [...key, "history"] });
+				if (!incognito && q) client.invalidateQueries({ queryKey: [...key, "history"] });
 				if (target) setFallback(target);
 			}
 		} catch {
@@ -209,6 +209,20 @@ function SearchContent({ userId }: { userId?: string }) {
 								}}
 								maxLength={1000}
 								disabled={pending}
+								onPointerDown={(event) => {
+									if (event.button !== 0 || document.activeElement !== event.currentTarget) return;
+									const animation = event.currentTarget
+										.closest(".search-bar")
+										?.getAnimations()
+										.find(
+											(animation) =>
+												animation instanceof CSSAnimation && animation.animationName === "search-focus-bloom",
+										);
+									if (animation) {
+										animation.currentTime = 0;
+										animation.play();
+									}
+								}}
 								onChange={(e) => {
 									setQuery(e.target.value);
 									setSearchFailed(false);
@@ -224,7 +238,7 @@ function SearchContent({ userId }: { userId?: string }) {
 										e.preventDefault();
 								}}
 							/>
-							<GlassAction type="submit" disabled={pending || !query.trim()} aria-label={l("search")}>
+							<GlassAction variant="filled" type="submit" disabled={pending} aria-label={l("search")}>
 								<Search size={21} />
 								<span className="search-submit-label">{pending ? l("saving") : l("search")}</span>
 							</GlassAction>

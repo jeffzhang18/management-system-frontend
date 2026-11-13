@@ -94,7 +94,7 @@ export function safeIcon(value: string | null | undefined): string | null {
 
 export function canSubmit(text: string, composing: boolean, submitting: boolean): boolean {
 	const query = text.trim();
-	return !composing && !submitting && query.length > 0 && query.length <= MAX_QUERY;
+	return !composing && !submitting && query.length <= MAX_QUERY;
 }
 
 /** Reuses the request ID only when retrying the same query and engine, so retries stay idempotent. */

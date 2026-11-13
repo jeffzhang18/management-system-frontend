@@ -1,9 +1,12 @@
-import { type ComponentProps, useEffect, useState } from "react";
 import { GlassSlider } from "@zakisheriff/liquid-glass";
+import { type ComponentProps, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import baiduIcon from "@/assets/search-engines/baidu.svg";
+import bingIcon from "@/assets/search-engines/bing.svg";
+import googleIcon from "@/assets/search-engines/google.svg";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/ui/sheet";
 import { GlassPanel } from "../subscriptions/glass";
 export function useLabels() {
 	const { t } = useTranslation();
@@ -99,23 +102,32 @@ export function SearchSelect<T extends string>({
 	options,
 	disabled,
 	className = "",
+	menuClassName = "",
 }: {
 	label: string;
 	value: T;
 	onChange: (value: T) => void;
-	options: { value: T; label: string }[];
+	options: { value: T; label: string; icon?: string }[];
 	disabled?: boolean;
 	className?: string;
+	menuClassName?: string;
 }) {
 	return (
 		<Select value={value} onValueChange={(next) => onChange(next as T)} disabled={disabled}>
 			<SelectTrigger aria-label={label} className={`search-select-trigger ${className}`}>
 				<SelectValue />
 			</SelectTrigger>
-			<SelectContent className="search-select-menu" sideOffset={6}>
+			<SelectContent className={`search-select-menu ${menuClassName}`} sideOffset={6}>
 				{options.map((option) => (
-					<SelectItem key={option.value} value={option.value}>
-						{option.label}
+					<SelectItem key={option.value} value={option.value} textValue={option.label}>
+						{option.icon ? (
+							<span className="search-engine-option">
+								<img src={option.icon} alt="" aria-hidden="true" className="search-engine-icon" />
+								<span className="search-engine-name">{option.label}</span>
+							</span>
+						) : (
+							option.label
+						)}
 					</SelectItem>
 				))}
 			</SelectContent>
@@ -142,10 +154,11 @@ export function EngineSelect({
 			onChange={onChange}
 			disabled={disabled}
 			className={className}
+			menuClassName="search-engine-menu"
 			options={[
-				{ value: "google", label: "Google" },
-				{ value: "baidu", label: l("baidu") },
-				{ value: "bing", label: "Bing" },
+				{ value: "google", label: "Google", icon: googleIcon },
+				{ value: "baidu", label: l("baidu"), icon: baiduIcon },
+				{ value: "bing", label: "Bing", icon: bingIcon },
 			]}
 		/>
 	);
@@ -163,7 +176,7 @@ export function OnlineImage({
 }) {
 	const [failed, setFailed] = useState(false);
 	return failed ? (
-		<span className={className} aria-label={alt}>
+		<span role="img" className={className} aria-label={alt}>
 			{alt.slice(0, 1).toUpperCase()}
 		</span>
 	) : (

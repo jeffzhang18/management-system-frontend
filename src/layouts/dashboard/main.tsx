@@ -1,3 +1,6 @@
+import { clone, concat } from "ramda";
+import { Suspense } from "react";
+import { Outlet, ScrollRestoration, useLocation } from "react-router";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { LineLoading } from "@/components/loading";
 import { GLOBAL_CONFIG } from "@/global-config";
@@ -5,9 +8,7 @@ import Page403 from "@/pages/sys/error/Page403";
 import { useSettings } from "@/store/settingStore";
 import { cn } from "@/utils";
 import { flattenTrees } from "@/utils/tree";
-import { clone, concat } from "ramda";
-import { Suspense } from "react";
-import { Outlet, ScrollRestoration, useLocation } from "react-router";
+import { mobileNavIndex } from "./mobile-nav-routes";
 import { backendNavData } from "./nav/nav-data/nav-data-backend";
 import { frontendNavData } from "./nav/nav-data/nav-data-frontend";
 
@@ -42,6 +43,8 @@ const Main = () => {
 					"transition-[max-width] duration-300 ease-in-out",
 					pathname === "/search" ? "p-0 max-w-full" : "px-4 pt-[6px] pb-4 sm:px-6 sm:pt-[14px] sm:pb-6 md:px-8 mx-auto",
 					{
+						"mobile-tab-page": mobileNavIndex(pathname) >= 0,
+						"mobile-tab-search": pathname === "/search",
 						"max-w-full": themeStretch,
 						"xl:max-w-screen-xl": !themeStretch && pathname !== "/search",
 					},

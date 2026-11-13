@@ -70,6 +70,9 @@
 			"noAccount": "Don't have an account?"
 		},
 		"nav": {
+			"mobileNavigation": "Main navigation",
+			"searchTab": "Search",
+			"subscriptionsTab": "Subs",
 			"dashboard": "Dashboard",
 			"pages": "Pages",
 			"others": "Others",

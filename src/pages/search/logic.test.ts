@@ -89,12 +89,15 @@ describe("search page logic", () => {
 		expect(safeIcon("https://example.com/icon.png")).toBe("https://example.com/icon.png");
 	});
 
-	it("blocks empty, oversized, composing and duplicate submissions", () => {
+	it("allows empty homepage navigation but blocks oversized, composing and duplicate submissions", () => {
 		expect(canSubmit("  query ", false, false)).toBe(true);
-		expect(canSubmit("   ", false, false)).toBe(false);
+		expect(canSubmit("", false, false)).toBe(true);
+		expect(canSubmit("   ", false, false)).toBe(true);
 		expect(canSubmit("a".repeat(1001), false, false)).toBe(false);
 		expect(canSubmit("query", true, false)).toBe(false);
 		expect(canSubmit("query", false, true)).toBe(false);
+		expect(canSubmit("", true, false)).toBe(false);
+		expect(canSubmit("", false, true)).toBe(false);
 	});
 
 	it("reuses request IDs only for retries of the same search", () => {

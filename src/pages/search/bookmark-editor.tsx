@@ -1,8 +1,9 @@
+import { GlassInput, GlassSwitch } from "@zakisheriff/liquid-glass";
 import { useEffect, useRef, useState } from "react";
 import searchService, { type Bookmark, type BookmarkInput } from "@/api/services/searchService";
 import { GlassAction } from "../subscriptions/glass";
-import { errorMessage, metadataCurrent, safeIcon, validUrl } from "./logic";
-import { OnlineImage, SearchSheet, useLabels } from "./shared";
+import { errorMessage, metadataCurrent, normalizeWebsiteUrl, safeIcon, validUrl } from "./logic";
+import { OnlineImage, SearchSelect, SearchSheet, useLabels } from "./shared";
 export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close: () => void; saved: () => void }) {
 	const l = useLabels();
 	const [form, setForm] = useState<BookmarkInput>({
@@ -31,7 +32,7 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 	);
 	const patch = (data: Partial<BookmarkInput>) => setForm((f) => ({ ...f, ...data }));
 	const metadata = async () => {
-		const url = validUrl(current.current.url);
+		const url = normalizeWebsiteUrl(current.current.url);
 		if (!url) {
 			setError(l("invalidUrl"));
 			return;
@@ -40,12 +41,13 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 		const abort = new AbortController();
 		controller.current = abort;
 		const seq = ++sequence.current;
-		const raw = current.current.url;
+		current.current = { ...current.current, url };
+		setForm((f) => ({ ...f, url }));
 		setFetching(true);
 		setError("");
 		try {
 			const result = await searchService.metadata(url, abort.signal);
-			if (!metadataCurrent(seq, sequence.current, raw, current.current.url)) return;
+			if (!metadataCurrent(seq, sequence.current, url, current.current.url)) return;
 			setForm((f) => ({
 				...f,
 				name: f.titleSource === "auto" ? (result.title || new URL(url).hostname).slice(0, 80) : f.name,
@@ -60,8 +62,9 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 		}
 	};
 	const save = async () => {
-		const url = validUrl(form.url);
-		if (!url || !form.name.trim() || form.name.trim().length > 80) {
+		const url = normalizeWebsiteUrl(form.url);
+		const name = form.name.trim() || (form.titleSource === "auto" && url ? new URL(url).hostname : "");
+		if (!url || !name || name.length > 80) {
 			setError(l("bookmarkInvalid"));
 			return;
 		}
@@ -77,7 +80,7 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 		setBusy(true);
 		setError("");
 		try {
-			const data = { ...form, url, name: form.name.trim() };
+			const data = { ...form, url, name };
 			if (item) await searchService.updateBookmark(item.id, { ...data, version: item.version });
 			else await searchService.createBookmark(data);
 			saved();
@@ -88,20 +91,36 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 		}
 	};
 	return (
-		<SearchSheet title={item ? l("editBookmark") : l("addBookmark")} close={() => !busy && close()}>
-			<div className="search-fields">
-				<label>
-					{l("website")}
-					<input
+		<SearchSheet
+			title={item ? l("editBookmark") : l("addBookmark")}
+			close={() => !busy && close()}
+			footer={
+				<>
+					<button type="button" disabled={busy} onClick={close}>
+						{l("cancel")}
+					</button>
+					<GlassAction disabled={busy} onClick={save}>
+						{busy ? l("saving") : l("save")}
+					</GlassAction>
+				</>
+			}
+		>
+			<fieldset className="search-form search-fields" disabled={busy}>
+				<div className="search-field">
+					<span>{l("website")}</span>
+					<GlassInput
+						intensity={1}
+						aria-label={l("website")}
 						autoFocus
 						type="url"
 						maxLength={2048}
 						value={form.url}
-						placeholder="https://example.com"
+						placeholder="bing.com / https://bing.com"
 						onChange={(e) => {
 							sequence.current++;
 							controller.current?.abort();
 							setFetching(false);
+							setError("");
 							patch({
 								url: e.target.value,
 								metadataFetchedAt: null,
@@ -111,47 +130,57 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 						}}
 						onBlur={metadata}
 					/>
-				</label>
+				</div>
 				<button type="button" disabled={fetching} onClick={metadata}>
 					{fetching ? l("fetching") : l("fetchMetadata")}
 				</button>
-				<label>
-					{l("name")}
-					<input
+				<div className="search-field">
+					<span>{l("name")}</span>
+					<GlassInput
+						intensity={1}
+						aria-label={l("name")}
 						maxLength={80}
 						value={form.name}
 						onChange={(e) => patch({ name: e.target.value, titleSource: "custom" })}
 					/>
-				</label>
-				<label className="search-check">
-					<input
-						type="checkbox"
+				</div>
+				<label className="search-check" htmlFor="search-bookmark-auto-title">
+					<span>{l("autoTitle")}</span>
+					<GlassSwitch
+						id="search-bookmark-auto-title"
+						intensity={1}
+						tint="var(--primary)"
+						aria-label={l("autoTitle")}
 						checked={form.titleSource === "auto"}
-						onChange={(e) => {
-							patch({ titleSource: e.target.checked ? "auto" : "custom" });
+						onChange={(checked) => {
+							patch({ titleSource: checked ? "auto" : "custom" });
 						}}
 					/>
-					{l("autoTitle")}
 				</label>
-				<label>
-					{l("icon")}
-					<select
+				<div className="search-field">
+					<span>{l("icon")}</span>
+					<SearchSelect
+						label={l("icon")}
+						disabled={busy}
 						value={form.iconSource}
-						onChange={(e) => {
-							patch({ iconSource: e.target.value as "auto" | "custom", iconUrl: null });
+						onChange={(iconSource) => {
+							patch({ iconSource, iconUrl: null });
 							setVerified("");
 							setPreview("");
 						}}
-					>
-						<option value="auto">{l("autoIcon")}</option>
-						<option value="custom">{l("customIcon")}</option>
-					</select>
-				</label>
+						options={[
+							{ value: "auto", label: l("autoIcon") },
+							{ value: "custom", label: l("customIcon") },
+						]}
+					/>
+				</div>
 				{form.iconSource === "custom" && (
 					<>
-						<label>
-							{l("imageUrl")}
-							<input
+						<div className="search-field">
+							<span>{l("imageUrl")}</span>
+							<GlassInput
+								intensity={1}
+								aria-label={l("imageUrl")}
 								type="url"
 								maxLength={2048}
 								value={form.iconUrl || ""}
@@ -162,7 +191,7 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 									setPreview("");
 								}}
 							/>
-						</label>
+						</div>
 						<button
 							type="button"
 							onClick={() => {
@@ -201,20 +230,12 @@ export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close:
 						}}
 					/>
 				)}
-			</div>
+			</fieldset>
 			{error && (
 				<p role="alert" className="search-error">
 					{error}
 				</p>
 			)}
-			<div className="search-footer">
-				<button disabled={busy} onClick={close}>
-					{l("cancel")}
-				</button>
-				<GlassAction disabled={busy} onClick={save}>
-					{busy ? l("saving") : l("save")}
-				</GlassAction>
-			</div>
 		</SearchSheet>
 	);
 }

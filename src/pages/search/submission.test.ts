@@ -6,6 +6,35 @@ function popup() {
 	return { closed: false, close: vi.fn(), location: { replace: vi.fn() } };
 }
 describe("record before navigation", () => {
+	it.each(["google", "baidu", "bing"] as const)(
+		"opens the %s homepage for empty input without recording history",
+		async (engine) => {
+			const record = vi.fn(async () => result);
+			for (const query of ["", "   "]) {
+				for (const incognito of [false, true]) {
+					for (const newTab of [false, true]) {
+						const window = popup();
+						const navigate = vi.fn();
+						await recordThenNavigate({
+							record: () => resolveSearch(query, engine, incognito, record),
+							popup: newTab ? window : null,
+							newTab,
+							navigate,
+							active: () => true,
+						});
+						if (newTab) {
+							expect(window.location.replace).toHaveBeenCalledWith(`https://www.${engine}.com/`);
+							expect(navigate).not.toHaveBeenCalled();
+						} else {
+							expect(navigate).toHaveBeenCalledWith(`https://www.${engine}.com/`);
+							expect(window.location.replace).not.toHaveBeenCalled();
+						}
+					}
+				}
+			}
+			expect(record).not.toHaveBeenCalled();
+		},
+	);
 	it("bypasses history entirely for private searches across all engines", async () => {
 		const record = vi.fn(async () => result);
 		for (const engine of ["google", "bing", "baidu"] as const) {

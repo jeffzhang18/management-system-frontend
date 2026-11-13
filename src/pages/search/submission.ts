@@ -8,6 +8,14 @@ export function resolveSearch(
 	incognito: boolean,
 	record: () => Promise<SearchResult>,
 ): Promise<{ targetUrl: string }> {
+	if (!query.trim()) {
+		const homepages: Record<Engine, string> = {
+			google: "https://www.google.com/",
+			baidu: "https://www.baidu.com/",
+			bing: "https://www.bing.com/",
+		};
+		return Promise.resolve({ targetUrl: homepages[engine] });
+	}
 	if (!incognito) return record();
 	const destinations: Record<Engine, [string, string]> = {
 		google: ["https://www.google.com/search", "q"],
