@@ -1,220 +1,509 @@
-import { useEffect, useRef, useState } from "react";
-import searchService, { type Bookmark, type BookmarkInput } from "@/api/services/searchService";
-import { GlassAction } from "../subscriptions/glass";
-import { errorMessage, metadataCurrent, safeIcon, validUrl } from "./logic";
-import { OnlineImage, SearchSheet, useLabels } from "./shared";
-export function BookmarkEditor({ item, close, saved }: { item?: Bookmark; close: () => void; saved: () => void }) {
-	const l = useLabels();
-	const [form, setForm] = useState<BookmarkInput>({
-		name: item?.name || "",
-		url: item?.url || "",
-		titleSource: item?.titleSource || "auto",
-		iconSource: item?.iconSource || "auto",
-		iconUrl: item?.iconUrl || null,
-		metadataFetchedAt: item?.metadataFetchedAt || null,
-	});
-	const current = useRef(form);
-	current.current = form;
-	const [busy, setBusy] = useState(false);
-	const [fetching, setFetching] = useState(false);
-	const [error, setError] = useState("");
-	const [preview, setPreview] = useState("");
-	const [verified, setVerified] = useState("");
-	const sequence = useRef(0);
-	const controller = useRef<AbortController | null>(null);
-	useEffect(
-		() => () => {
-			sequence.current++;
-			controller.current?.abort();
+{
+	"sys": {
+		"api": {
+			"apiRequestFailed": "接口请求失败，请稍后重试。",
+			"apiTimeoutMessage": "接口请求超时，请刷新页面后重试。",
+			"errMsg401": "用户没有权限（令牌、用户名或密码错误）。",
+			"errMsg403": "用户已授权，但禁止访问。",
+			"errMsg404": "网络请求错误，未找到该资源。",
+			"errMsg405": "网络请求错误，请求方法不被允许。",
+			"errMsg408": "网络请求超时。",
+			"errMsg500": "服务器错误，请联系管理员。",
+			"errMsg501": "网络未实现。",
+			"errMsg502": "网络错误。",
+			"errMsg503": "服务不可用，服务器暂时过载或维护中。",
+			"errMsg504": "网络超时。",
+			"errMsg505": "HTTP 版本不支持该请求。",
+			"errorMessage": "操作失败，系统异常。",
+			"errorTip": "错误提示",
+			"networkException": "网络异常",
+			"networkExceptionMsg": "请检查网络连接是否正常。",
+			"operationFailed": "操作失败",
+			"operationSuccess": "操作成功",
+			"successTip": "成功提示",
+			"timeoutMessage": "登录超时，请重新登录。"
 		},
-		[],
-	);
-	const patch = (data: Partial<BookmarkInput>) => setForm((f) => ({ ...f, ...data }));
-	const metadata = async () => {
-		const url = validUrl(current.current.url);
-		if (!url) {
-			setError(l("invalidUrl"));
-			return;
+		"docs": "文档",
+		"login": {
+			"accountPlaceholder": "请输入用户名",
+			"backSignIn": "返回登录",
+			"confirmPassword": "确认密码",
+			"confirmPasswordPlaceholder": "请输入确认密码",
+			"diffPwd": "两次输入的密码不一致",
+			"email": "邮箱",
+			"emaildPlaceholder": "请输入邮箱",
+			"forgetFormSecondTitle": "请输入与账户关联的邮箱地址，我们会向你发送重置密码链接。",
+			"forgetFormTitle": "重置密码",
+			"forgetPassword": "忘记密码？",
+			"loginButton": "登录",
+			"loginSuccessDesc": "欢迎回来",
+			"loginSuccessTitle": "登录成功",
+			"logout": "退出登录",
+			"mobile": "手机号",
+			"mobilePlaceholder": "请输入手机号",
+			"mobileSignInFormTitle": "手机登录",
+			"otherSignIn": "其他登录方式",
+			"password": "密码",
+			"passwordPlaceholder": "请输入密码",
+			"policy": "我同意 xxx 隐私政策",
+			"policyPlaceholder": "勾选后才能注册",
+			"privacyPolicy": "隐私政策",
+			"qrSignInFormTitle": "二维码登录",
+			"registerAndAgree": "注册即表示我同意",
+			"registerButton": "注册",
+			"rememberMe": "记住我",
+			"scanSign": "扫码后点击“确认”即可完成登录",
+			"sendEmailButton": "发送邮件",
+			"sendSmsButton": "发送短信验证码",
+			"sendSmsText": "{{second}} 秒后重试",
+			"signInDesc": "输入你的个人信息开始使用。",
+			"signInFormTitle": "登录到你的账户",
+			"signInPrimaryTitle": "欢迎回来",
+			"signInSecondTitle": "后台管理系统",
+			"signInTitle": "",
+			"signUpFormTitle": "注册",
+			"smsCode": "短信验证码",
+			"smsPlaceholder": "请输入短信验证码",
+			"termsOfService": "服务条款",
+			"userName": "用户名",
+			"signInFormDescription": "输入你的账号登录到你的账户",
+			"noAccount": "还没有账号？"
+		},
+		"nav": {
+			"dashboard": "仪表盘",
+			"pages": "页面",
+			"others": "其他",
+			"ui": "界面",
+			"custom_ui_components": "自定义 UI 组件",
+			"analysis": "分析页",
+			"weather": "天气",
+			"subscriptions": "软件订阅",
+			"search": "聚合搜索",
+			"animate": "动画",
+			"blank": "空白页",
+			"blog": "博客",
+			"calendar": "日历",
+			"record": "记录",
+			"chart": "图表",
+			"clipboard": "剪贴板",
+			"components": "组件",
+			"disabled": "禁用项",
+			"editor": "编辑器",
+			"error": {
+				"403": "403",
+				"404": "404",
+				"500": "500",
+				"index": "错误页"
+			},
+			"external_link": "外链",
+			"link": "链接项",
+			"functions": "功能",
+			"i18n": "多语言",
+			"icon": "图标",
+			"iframe": "内嵌页",
+			"kanban": "看板",
+			"label": "标签项",
+			"permission": "权限",
+			"permission.page_test": "页面权限测试",
+			"management": "管理",
+			"markdown": "Markdown",
+			"menulevel": {
+				"1a": "多级菜单 1a",
+				"1b": {
+					"2a": "多级菜单 2a",
+					"2b": {
+						"3a": "多级菜单 3a",
+						"3b": "多级菜单 3b",
+						"index": "多级菜单 2b"
+					},
+					"index": "多级菜单 1b"
+				},
+				"index": "多级菜单"
+			},
+			"scroll": "滚动",
+			"system": {
+				"index": "系统",
+				"organization": "组织",
+				"permission": "权限",
+				"role": "角色",
+				"user": "用户",
+				"user_detail": "用户详情"
+			},
+			"toast": "提示",
+			"token_expired": "令牌失效",
+			"upload": "上传",
+			"user": {
+				"account": "账户",
+				"index": "用户",
+				"profile": "个人资料"
+			},
+			"homeDigitalTwin": "家庭数字孪生",
+			"workbench": "工作台"
+		},
+		"settings": {
+			"accordion": "手风琴菜单",
+			"breadcrumb": "面包屑",
+			"darkSidebar": "深色侧边栏",
+			"exitFullscreen": "退出全屏",
+			"family": "字体系列",
+			"font": "字体",
+			"fullscreen": "全屏",
+			"layout": "布局",
+			"mode": "模式",
+			"multiTab": "多标签",
+			"page": "页面",
+			"presetThemes": "预设主题",
+			"size": "字号",
+			"stretch": "拉伸",
+			"stretchTip": "仅在屏幕宽度大于 1280px（xl）时可用",
+			"title": "设置"
+		},
+		"profile": {
+			"tabs": {
+				"profile": "资料",
+				"teams": "团队",
+				"projects": "项目",
+				"connections": "关系"
+			},
+			"cards": {
+				"about": "关于",
+				"activityTimeline": "动态时间线",
+				"connections": "关系",
+				"teams": "团队"
+			},
+			"about": {
+				"fullName": "姓名",
+				"role": "角色",
+				"country": "国家",
+				"city": "城市",
+				"language": "语言",
+				"contact": "联系方式",
+				"email": "邮箱"
+			},
+			"labels": {
+				"client": "客户",
+				"connections": "关系",
+				"members": "成员",
+				"projects": "项目",
+				"tasks": "任务",
+				"startDate": "开始日期",
+				"deadline": "截止日期",
+				"allHours": "总工时",
+				"daysLeft_one": "剩余 {{count}} 天",
+				"daysLeft_other": "剩余 {{count}} 天"
+			},
+			"actions": {
+				"connected": "已连接",
+				"connect": "连接"
+			},
+			"tags": {
+				"developer": "开发",
+				"designer": "设计",
+				"test": "测试",
+				"marketing": "营销"
+			},
+			"timeline": {
+				"invoicesPaid": {
+					"title": "8 笔发票已支付",
+					"time": "星期三",
+					"description": "发票款项已支付给公司。"
+				},
+				"newProject": {
+					"title": "为客户创建了一个新项目",
+					"time": "4 月 18 日",
+					"description": "新的客户项目已创建并同步给团队。"
+				},
+				"order": {
+					"title": "9 月份的订单 #37745",
+					"time": "1 月 10 日",
+					"description": "订单更新已同步到工作区。"
+				},
+				"meeting": {
+					"title": "公开会议",
+					"time": "9 月 30 日"
+				}
+			},
+			"emptyAbout": "暂未填写个人简介。"
+		},
+		"account": {
+			"tabs": {
+				"general": "通用",
+				"notifications": "通知",
+				"security": "安全"
+			},
+			"actions": {
+				"saveChanges": "保存更改"
+			},
+			"messages": {
+				"updateSuccess": "更新成功！",
+				"missingUser": "无法识别当前用户，请重新登录。"
+			},
+			"general": {
+				"publicProfile": "公开资料",
+				"deleteUser": "删除用户",
+				"fields": {
+					"username": "用户名",
+					"email": "邮箱",
+					"phone": "手机号",
+					"country": "国家",
+					"address": "地址",
+					"city": "城市",
+					"code": "邮编",
+					"about": "个人简介"
+				}
+			},
+			"notifications": {
+				"activity": {
+					"title": "动态通知",
+					"description": "管理与动态相关的邮件通知。",
+					"items": {
+						"formAnswer": "当有人回复我的表单时发送邮件",
+						"articleComment": "当有人评论我的文章时发送邮件",
+						"newFollower": "当有人关注我时发送邮件"
+					}
+				},
+				"applications": {
+					"title": "应用通知",
+					"description": "管理产品与内容渠道的更新通知。",
+					"items": {
+						"news": "新闻与公告",
+						"productUpdates": "每周产品更新",
+						"blogDigest": "每周博客摘要"
+					}
+				}
+			},
+			"security": {
+				"fields": {
+					"oldPassword": "旧密码",
+					"newPassword": "新密码",
+					"confirmPassword": "确认新密码"
+				},
+				"validation": {
+					"oldPasswordRequired": "请输入旧密码",
+					"newPasswordRequired": "请输入新密码",
+					"confirmPasswordRequired": "请确认新密码",
+					"passwordNotMatch": "两次输入的密码不一致"
+				}
+			}
+		},
+		"tab": {
+			"close": "关闭",
+			"closeAll": "关闭全部",
+			"closeLeft": "关闭左侧",
+			"closeOthers": "关闭其他",
+			"closeRight": "关闭右侧",
+			"fullscreen": "全屏",
+			"refresh": "刷新"
+		},
+		"analysis": {
+			"title": "分析概览",
+			"subtitle": "查看关键指标，了解趋势并辅助决策。",
+			"showBy": "显示维度：",
+			"time": {
+				"week": "周",
+				"month": "月"
+			},
+			"webAnalytic": "网站分析",
+			"today": "今天",
+			"previousWeek": "上一周",
+			"previousMonth": "上个月",
+			"nextWeek": "下一周",
+			"nextMonth": "下个月",
+			"loadFailed": "无法加载分析数据。",
+			"tryAgain": "重试",
+			"exportData": "导出数据",
+			"topPages": "热门页面",
+			"sessionDevices": "会话设备",
+			"topChannel": "热门渠道",
+			"trafficData": "流量数据",
+			"metrics": {
+				"pageViews": "页面浏览量",
+				"avgTimeOnPage": "平均页面停留时间",
+				"visitor": "访客数",
+				"conversionRate": "转化率",
+				"adCampaignClicks": "广告活动点击量"
+			},
+			"comparison": {
+				"lastDay": "较前一天",
+				"lastWeek": "较上一周",
+				"lastMonth": "较上个月",
+				"lastYear": "较上一年"
+			},
+			"devices": {
+				"desktop": "桌面端",
+				"mobile": "移动端",
+				"tablet": "平板"
+			},
+			"sources": {
+				"direct": "直接访问",
+				"natural": "自然流量",
+				"referral": "推荐流量",
+				"socialMedia": "社交媒体",
+				"emailCampaign": "邮件活动"
+			},
+			"chart": {
+				"viewsTooltip": "{{value}} 次浏览"
+			},
+			"table": {
+				"pageUrl": "页面 URL",
+				"views": "浏览量",
+				"uniqueVisitors": "独立访客",
+				"channel": "渠道",
+				"percentage": "占比",
+				"total": "总计",
+				"source": "来源",
+				"visits": "访问量",
+				"bounceRate": "跳出率",
+				"avgSessionDuration": "平均会话时长",
+				"progressToGoal": "目标进度 (%)"
+			}
+		},
+		"record": {
+			"title": "工作记录",
+			"subtitle": "日历工作台",
+			"exportRecords": "导出记录",
+			"previousYear": "上一年",
+			"previousMonth": "上个月",
+			"nextMonth": "下个月",
+			"nextYear": "下一年",
+			"today": "今天",
+			"new": "新建",
+			"dayDetail": "当日详情",
+			"viewAllToday": "查看当天全部",
+			"addOnDate": "在 {{date}} 新建记录",
+			"viewDate": "查看 {{date}} 的记录",
+			"moreCount": "+{{count}} 条",
+			"dayRecordCount": "共 {{count}} 条工作记录",
+			"emptyDay": "这一天还没有工作记录",
+			"deleteRecord": "删除记录",
+			"deleteRecordConfirm": "确认删除这条记录？",
+			"recordDeleted": "记录已删除",
+			"recordSaved": "记录已保存",
+			"recordMissing": "记录不存在或已被删除",
+			"backCalendar": "返回日历",
+			"backDay": "返回每日记录",
+			"detailTitle": "工作详情",
+			"allDay": "全天",
+			"fromTime": "{{time}} 起",
+			"noDetails": "暂无详细内容",
+			"importLoading": "正在导入记录...",
+			"importSuccess": "成功导入 {{count}} 条记录",
+			"importFailed": "导入失败，请选择有效的记录 JSON 文件",
+			"contributions": {
+				"title": "工作强度",
+				"summary": "{{year}} 年共 {{count}} 条工作记录",
+				"empty": "过去一年还没有工作记录",
+				"yearLabel": "{{year}} 年工作强度",
+				"selectYear": "选择年份",
+				"tooltip": "{{date}} · {{count}} 条工作记录",
+				"monday": "一",
+				"wednesday": "三",
+				"friday": "五",
+				"less": "少",
+				"more": "多",
+				"legendLevel0": "0 条记录",
+				"legendLevel1": "1-2 条记录",
+				"legendLevel2": "3-4 条记录",
+				"legendLevel3": "5-6 条记录",
+				"legendLevel4": ">=7 条记录"
+			},
+			"form": {
+				"title": "新建记录 · {{date}}",
+				"quickCreate": "快速创建",
+				"detailCreate": "详细创建",
+				"quickSave": "快速保存",
+				"save": "保存记录",
+				"cancel": "取消",
+				"recordTitle": "标题",
+				"recordTitleRequired": "请输入记录标题",
+				"recordTitlePlaceholder": "今天完成了什么？",
+				"theme": "主题",
+				"newTheme": "新主题",
+				"themeNameRequired": "请输入主题名称",
+				"themeNamePlaceholder": "主题名称",
+				"add": "添加",
+				"deleteTheme": "删除主题 {{name}}",
+				"themeDeleted": "主题已删除",
+				"time": "时间",
+				"startTime": "开始时间",
+				"endTime": "结束时间",
+				"hour": "时",
+				"minute": "分",
+				"wheelTimeHint": "上下拖动，或点击时间直接确认",
+				"timeBack": "返回",
+				"timeConfirm": "确认",
+				"timeFocusHint": "当前第 {{current}} 步，共 4 步；选择后自动进入下一步",
+				"timeGestureHint": "在每个时间数字上滚动或上下滑动，选择完成后统一确认",
+				"timeSelectionProgress": "时间选择进度",
+				"details": "详细内容",
+				"preview": "预览",
+				"edit": "编辑",
+				"markdownPlaceholder": "支持 Markdown，例如：## 今日成果",
+				"nothingToPreview": "暂无可预览的内容",
+				"importTitle": "从文件导入记录",
+				"importFormatTitle": "JSON 格式示例",
+				"importFormatNote": "recordDate 和 title 为必填字段；themeId、startTime、endTime、contentMd 为可选字段。也支持直接上传记录数组。",
+				"importHint": "支持由本页面导出的 JSON 文件",
+				"uploadJson": "上传 JSON",
+				"uploadFile": "上传文件"
+			},
+			"export": {
+				"title": "导出工作记录",
+				"subtitle": "按日期范围选择要导出的记录与格式",
+				"startDate": "开始日期",
+				"endDate": "结束日期",
+				"format": "导出格式",
+				"plainText": "纯文本",
+				"printPreview": "打印 / 预览",
+				"reimportable": "可再导入",
+				"aiSummary": "AI 总结",
+				"includeNextWeekPlan": "同时生成下周工作安排",
+				"weeklyReportTitle": "本周工作总结",
+				"nextWeekPlanTitle": "下周工作安排",
+				"generatingNextWeekPlan": "正在生成下周工作安排…",
+				"rangeCount": "当前范围内共 {{count}} 条记录",
+				"action": "导出",
+				"generating": "正在生成…",
+				"aiGenerated": "AI 总结已生成",
+				"aiEmpty": "AI 未返回报告内容",
+				"copy": "复制内容",
+				"copied": "已复制到剪贴板",
+				"copyFailed": "复制失败，请手动选择内容复制",
+				"close": "关闭",
+				"emptyRange": "所选日期范围内没有记录",
+				"popupBlocked": "浏览器阻止了打印窗口，请允许弹出窗口后重试",
+				"pdfOpened": "已打开 PDF 打印窗口",
+				"exported": "已导出 {{count}} 条记录",
+				"rangeTo": "至",
+				"generatedBy": "由工作记录日历导出"
+			},
+			"themes": {
+				"development": "开发",
+				"meeting": "会议",
+				"design": "设计",
+				"research": "调研",
+				"operations": "运维",
+				"other": "其他"
+			}
+		},
+		"weather": {
+			"whichCityPlaceHolder": "请输入城市",
+			"noMatchedCity": "没有匹配的城市",
+			"pageDescription": "搜索并选择城市，将其固定为可拖拽排序的天气卡片。",
+			"noCitySelected": "暂未选择城市",
+			"emptyCardHint": "选择城市后，这里会显示对应的天气卡片。",
+			"feelsLike": "体感温度",
+			"humidity": "湿度",
+			"windSpeed": "风速",
+			"pressure": "气压",
+			"windDirection": "风向",
+			"liveWeather": "实时天气",
+			"currentWeatherInfo": "当前天气详情显示在这里。",
+			"loadFailed": "天气加载失败",
+			"dragCity": "拖动 {{city}}",
+			"removeCity": "移除 {{city}}",
+			"dragCard": "拖动 {{city}} 的天气卡片",
+			"noData": "暂无数据"
 		}
-		controller.current?.abort();
-		const abort = new AbortController();
-		controller.current = abort;
-		const seq = ++sequence.current;
-		const raw = current.current.url;
-		setFetching(true);
-		setError("");
-		try {
-			const result = await searchService.metadata(url, abort.signal);
-			if (!metadataCurrent(seq, sequence.current, raw, current.current.url)) return;
-			setForm((f) => ({
-				...f,
-				name: f.titleSource === "auto" ? (result.title || new URL(url).hostname).slice(0, 80) : f.name,
-				iconUrl: f.iconSource === "auto" ? safeIcon(result.iconUrl) : f.iconUrl,
-				metadataFetchedAt: result.fetchedAt,
-			}));
-			if (result.status !== "ok") setError(l("metadataFailed"));
-		} catch {
-			if (!abort.signal.aborted && seq === sequence.current) setError(l("metadataFailed"));
-		} finally {
-			if (seq === sequence.current) setFetching(false);
-		}
-	};
-	const save = async () => {
-		const url = validUrl(form.url);
-		if (!url || !form.name.trim() || form.name.trim().length > 80) {
-			setError(l("bookmarkInvalid"));
-			return;
-		}
-		if (
-			form.iconSource === "custom" &&
-			form.iconUrl &&
-			(form.iconUrl !== item?.iconUrl || item?.iconSource !== "custom") &&
-			(verified !== form.iconUrl || !validUrl(form.iconUrl, true))
-		) {
-			setError(l("verifyImage"));
-			return;
-		}
-		setBusy(true);
-		setError("");
-		try {
-			const data = { ...form, url, name: form.name.trim() };
-			if (item) await searchService.updateBookmark(item.id, { ...data, version: item.version });
-			else await searchService.createBookmark(data);
-			saved();
-		} catch (e) {
-			setError(errorMessage(e, l("saveFailed"), l("conflict")));
-		} finally {
-			setBusy(false);
-		}
-	};
-	return (
-		<SearchSheet title={item ? l("editBookmark") : l("addBookmark")} close={() => !busy && close()}>
-			<div className="search-fields">
-				<label>
-					{l("website")}
-					<input
-						autoFocus
-						type="url"
-						maxLength={2048}
-						value={form.url}
-						placeholder="https://example.com"
-						onChange={(e) => {
-							sequence.current++;
-							controller.current?.abort();
-							setFetching(false);
-							patch({
-								url: e.target.value,
-								metadataFetchedAt: null,
-								...(form.iconSource === "auto" ? { iconUrl: null } : {}),
-								...(form.titleSource === "auto" ? { name: "" } : {}),
-							});
-						}}
-						onBlur={metadata}
-					/>
-				</label>
-				<button type="button" disabled={fetching} onClick={metadata}>
-					{fetching ? l("fetching") : l("fetchMetadata")}
-				</button>
-				<label>
-					{l("name")}
-					<input
-						maxLength={80}
-						value={form.name}
-						onChange={(e) => patch({ name: e.target.value, titleSource: "custom" })}
-					/>
-				</label>
-				<label className="search-check">
-					<input
-						type="checkbox"
-						checked={form.titleSource === "auto"}
-						onChange={(e) => {
-							patch({ titleSource: e.target.checked ? "auto" : "custom" });
-						}}
-					/>
-					{l("autoTitle")}
-				</label>
-				<label>
-					{l("icon")}
-					<select
-						value={form.iconSource}
-						onChange={(e) => {
-							patch({ iconSource: e.target.value as "auto" | "custom", iconUrl: null });
-							setVerified("");
-							setPreview("");
-						}}
-					>
-						<option value="auto">{l("autoIcon")}</option>
-						<option value="custom">{l("customIcon")}</option>
-					</select>
-				</label>
-				{form.iconSource === "custom" && (
-					<>
-						<label>
-							{l("imageUrl")}
-							<input
-								type="url"
-								maxLength={2048}
-								value={form.iconUrl || ""}
-								placeholder="https://…"
-								onChange={(e) => {
-									patch({ iconUrl: e.target.value || null });
-									setVerified("");
-									setPreview("");
-								}}
-							/>
-						</label>
-						<button
-							type="button"
-							onClick={() => {
-								if (!validUrl(form.iconUrl || "", true)) {
-									setError(l("invalidImage"));
-									return;
-								}
-								setError("");
-								setPreview(form.iconUrl!);
-							}}
-						>
-							{l("preview")}
-						</button>
-						<button
-							type="button"
-							onClick={() => {
-								patch({ iconUrl: null });
-								setPreview("");
-							}}
-						>
-							{l("removeImage")}
-						</button>
-					</>
-				)}
-				{(preview || (form.iconSource === "auto" && safeIcon(form.iconUrl))) && (
-					<OnlineImage
-						key={preview || form.iconUrl}
-						url={preview || safeIcon(form.iconUrl)!}
-						alt={form.name || l("icon")}
-						className="search-icon-preview"
-						onResult={(ok) => {
-							if (preview) {
-								setVerified(ok ? preview : "");
-								if (!ok) setError(l("imageFailed"));
-							}
-						}}
-					/>
-				)}
-			</div>
-			{error && (
-				<p role="alert" className="search-error">
-					{error}
-				</p>
-			)}
-			<div className="search-footer">
-				<button disabled={busy} onClick={close}>
-					{l("cancel")}
-				</button>
-				<GlassAction disabled={busy} onClick={save}>
-					{busy ? l("saving") : l("save")}
-				</GlassAction>
-			</div>
-		</SearchSheet>
-	);
+	}
 }

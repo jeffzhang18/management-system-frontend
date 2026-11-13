@@ -1,35 +1,153 @@
-import { useState } from "react";
+import { type ComponentProps, useEffect, useState } from "react";
+import { GlassSlider } from "@zakisheriff/liquid-glass";
 import { useTranslation } from "react-i18next";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/ui/sheet";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
+import { GlassPanel } from "../subscriptions/glass";
 export function useLabels() {
 	const { t } = useTranslation();
 	return (key: string) => t(`search.${key}`);
+}
+
+/** Explicit keyboard handling also works when the library captures pointer input. */
+export function SearchSlider(props: ComponentProps<typeof GlassSlider>) {
+	return (
+		<GlassSlider
+			tint="var(--primary)"
+			{...props}
+			onKeyDown={(event) => {
+				const { min = 0, max = 100, value = 0, step = 1, onChange } = props;
+				const increment = Number(step) || 1;
+				const values: Record<string, number> = {
+					Home: min,
+					End: max,
+					ArrowRight: value + increment,
+					ArrowUp: value + increment,
+					ArrowLeft: value - increment,
+					ArrowDown: value - increment,
+					PageUp: value + increment * 10,
+					PageDown: value - increment * 10,
+				};
+				const next = values[event.key];
+				if (next === undefined) return;
+				event.preventDefault();
+				event.currentTarget.closest(".lg-slider")?.setAttribute("data-keyboard", "");
+				onChange?.(Number(Math.min(max, Math.max(min, next)).toFixed(10)));
+			}}
+		/>
+	);
 }
 export function SearchSheet({
 	title,
 	children,
 	close,
+	footer,
 }: {
 	title: string;
 	children: React.ReactNode;
 	close: () => void;
+	footer?: React.ReactNode;
 }) {
 	const mobile = useMediaQuery({ maxWidth: 767 });
+	const [viewport, setViewport] = useState<{ height: number; bottom: number }>();
+	useEffect(() => {
+		const visual = window.visualViewport;
+		if (!mobile || !visual) return;
+		const update = () =>
+			setViewport({
+				height: Math.min(visual.height * 0.9, 860),
+				bottom: Math.max(0, window.innerHeight - visual.height - visual.offsetTop),
+			});
+		update();
+		visual.addEventListener("resize", update);
+		visual.addEventListener("scroll", update);
+		return () => {
+			visual.removeEventListener("resize", update);
+			visual.removeEventListener("scroll", update);
+		};
+	}, [mobile]);
 	return (
 		<Sheet open onOpenChange={(open) => !open && close()}>
 			<SheetContent
 				side={mobile ? "bottom" : "right"}
-				className="search-sheet w-full sm:max-w-lg overflow-y-auto max-h-[92dvh] md:max-h-none p-5"
+				className="search-sheet"
 				aria-describedby={undefined}
+				style={
+					mobile && viewport
+						? { height: viewport.height, maxHeight: viewport.height, bottom: viewport.bottom }
+						: undefined
+				}
 			>
-				<SheetHeader className="p-0 pr-8">
-					<SheetTitle>{title}</SheetTitle>
-					<SheetDescription className="sr-only">{title}</SheetDescription>
-				</SheetHeader>
-				{children}
+				<GlassPanel className="search-sheet-material" padding="0" radius="28px">
+					<SheetHeader className="search-sheet-header">
+						<SheetTitle>{title}</SheetTitle>
+						<SheetDescription className="sr-only">{title}</SheetDescription>
+					</SheetHeader>
+					<div className="search-sheet-body">{children}</div>
+					{footer && <div className="search-footer">{footer}</div>}
+				</GlassPanel>
 			</SheetContent>
 		</Sheet>
+	);
+}
+
+export function SearchSelect<T extends string>({
+	label,
+	value,
+	onChange,
+	options,
+	disabled,
+	className = "",
+}: {
+	label: string;
+	value: T;
+	onChange: (value: T) => void;
+	options: { value: T; label: string }[];
+	disabled?: boolean;
+	className?: string;
+}) {
+	return (
+		<Select value={value} onValueChange={(next) => onChange(next as T)} disabled={disabled}>
+			<SelectTrigger aria-label={label} className={`search-select-trigger ${className}`}>
+				<SelectValue />
+			</SelectTrigger>
+			<SelectContent className="search-select-menu" sideOffset={6}>
+				{options.map((option) => (
+					<SelectItem key={option.value} value={option.value}>
+						{option.label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
+
+export function EngineSelect({
+	value,
+	onChange,
+	disabled,
+	className,
+}: {
+	value: import("@/api/services/searchService").Engine;
+	onChange: (value: import("@/api/services/searchService").Engine) => void;
+	disabled?: boolean;
+	className?: string;
+}) {
+	const l = useLabels();
+	return (
+		<SearchSelect
+			label={l("engine")}
+			value={value}
+			onChange={onChange}
+			disabled={disabled}
+			className={className}
+			options={[
+				{ value: "google", label: "Google" },
+				{ value: "baidu", label: l("baidu") },
+				{ value: "bing", label: "Bing" },
+			]}
+		/>
 	);
 }
 export function OnlineImage({

@@ -4,6 +4,7 @@ import { useSettings } from "@/store/settingStore";
 import { Button } from "@/ui/button";
 import { cn } from "@/utils";
 import type { ReactNode } from "react";
+import { useLocation } from "react-router";
 import AccountDropdown from "../components/account-dropdown";
 import BreadCrumb from "../components/bread-crumb";
 import NoticeButton from "../components/notice";
@@ -16,6 +17,7 @@ interface HeaderProps {
 
 export default function Header({ leftSlot }: HeaderProps) {
 	const { breadCrumb } = useSettings();
+	const compactSearch = useLocation().pathname === "/search";
 	return (
 		<header
 			data-slot="slash-layout-header"
@@ -38,7 +40,7 @@ export default function Header({ leftSlot }: HeaderProps) {
 				<Button
 					variant="ghost"
 					size="icon"
-					className="rounded-full"
+					className={cn("rounded-full", compactSearch && "max-[400px]:hidden")}
 					onClick={() => window.open("https://github.com/d3george/slash-admin")}
 				>
 					<Icon icon="mdi:github" size={24} />
@@ -46,7 +48,7 @@ export default function Header({ leftSlot }: HeaderProps) {
 				<Button
 					variant="ghost"
 					size="icon"
-					className="rounded-full"
+					className={cn("rounded-full", compactSearch && "max-[400px]:hidden")}
 					onClick={() => window.open("https://discord.gg/fXemAXVNDa")}
 				>
 					<Icon icon="carbon:logo-discord" size={24} />

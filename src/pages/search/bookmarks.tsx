@@ -9,10 +9,12 @@ import {
 } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import type { CSSProperties } from "react";
+import { GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { type CSSProperties, useEffect, useRef, useState } from "react";
 import type { Bookmark, SearchSettings } from "@/api/services/searchService";
-import { safeIcon, validUrl } from "./logic";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
+import { bookmarkGrid, safeIcon, validUrl } from "./logic";
 import { OnlineImage, useLabels } from "./shared";
 
 function Icon({ item }: { item: Bookmark }) {
@@ -42,6 +44,7 @@ function SortableBookmark({
 	remove: (item: Bookmark) => void;
 }) {
 	const l = useLabels();
+	const [actionsOpen, setActionsOpen] = useState(false);
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
 		id: item.id,
 		disabled: !editing || busy,
@@ -68,37 +71,61 @@ function SortableBookmark({
 				</a>
 			)}
 			{editing && (
-				<div className="search-bookmark-actions">
-					<button
-						type="button"
-						className="search-bookmark-handle"
-						disabled={busy}
-						title={l("reorder")}
-						aria-label={`${l("reorder")} ${item.name}`}
-						{...attributes}
-						{...listeners}
+				<Popover open={actionsOpen} onOpenChange={setActionsOpen}>
+					<PopoverTrigger asChild>
+						<button
+							type="button"
+							className="search-bookmark-tools"
+							disabled={busy}
+							aria-label={`${l("bookmarkActions")} ${item.name}`}
+							title={l("bookmarkActions")}
+						>
+							<MoreHorizontal size={18} />
+						</button>
+					</PopoverTrigger>
+					<PopoverContent
+						className="search-bookmark-actions"
+						sideOffset={8}
+						aria-label={`${l("bookmarkActions")} ${item.name}`}
 					>
-						<GripVertical size={16} />
-					</button>
-					<button
-						type="button"
-						disabled={busy}
-						title={l("editBookmark")}
-						aria-label={`${l("editBookmark")} ${item.name}`}
-						onClick={() => edit(item)}
-					>
-						<Pencil size={15} />
-					</button>
-					<button
-						type="button"
-						disabled={busy}
-						title={l("delete")}
-						aria-label={`${l("delete")} ${item.name}`}
-						onClick={() => remove(item)}
-					>
-						<Trash2 size={15} />
-					</button>
-				</div>
+						<button
+							type="button"
+							className="search-bookmark-handle"
+							disabled={busy}
+							title={l("reorder")}
+							aria-label={`${l("reorder")} ${item.name}`}
+							{...attributes}
+							{...listeners}
+							aria-describedby={`${attributes["aria-describedby"]} search-sort-help`}
+						>
+							<GripVertical size={16} />
+						</button>
+						<button
+							type="button"
+							disabled={busy}
+							title={l("editBookmark")}
+							aria-label={`${l("editBookmark")} ${item.name}`}
+							onClick={() => {
+								setActionsOpen(false);
+								edit(item);
+							}}
+						>
+							<Pencil size={15} />
+						</button>
+						<button
+							type="button"
+							disabled={busy}
+							title={l("delete")}
+							aria-label={`${l("delete")} ${item.name}`}
+							onClick={() => {
+								setActionsOpen(false);
+								remove(item);
+							}}
+						>
+							<Trash2 size={15} />
+						</button>
+					</PopoverContent>
+				</Popover>
 			)}
 		</li>
 	);
@@ -124,6 +151,17 @@ export function Bookmarks({
 	reorder: (from: number, to: number) => void;
 }) {
 	const l = useLabels();
+	const container = useRef<HTMLDivElement>(null);
+	const [width, setWidth] = useState(0);
+	const mobile = useMediaQuery({ maxWidth: 767 });
+	useEffect(() => {
+		const element = container.current;
+		if (!element) return;
+		const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+		observer.observe(element);
+		return () => observer.disconnect();
+	}, []);
+	const grid = bookmarkGrid(Math.max(0, width - 8), items.length + 1, settings, mobile, editing);
 	const sensors = useSensors(
 		useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
 		useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -135,15 +173,22 @@ export function Bookmarks({
 		if (from >= 0 && to >= 0) reorder(from, to);
 	};
 	const style = {
-		"--search-icon": `${settings.iconSize}px`,
-		"--search-gap": `${settings.gap}px`,
-		"--search-radius": `${settings.radius}px`,
-		"--search-count": settings.itemsPerLine,
+		"--search-icon": `${grid.icon}px`,
+		"--search-gap": `${grid.gap}px`,
+		"--search-radius": `${Math.min(settings.radius, grid.icon / 2)}px`,
+		"--search-cell": `${grid.cell}px`,
+		gridTemplateColumns: `repeat(${grid.columns}, minmax(0, ${grid.cell}px))`,
+		gridTemplateRows: grid.rows ? `repeat(${grid.rows}, auto)` : undefined,
+		gridAutoFlow: grid.column ? "column" : "row",
 	} as CSSProperties;
 	return (
-		<div className="search-bookmarks-wrap">
+		<div className="search-bookmarks-wrap" ref={container}>
 			{!items.length && <p className="search-empty">{l("emptyBookmarks")}</p>}
-			{editing && items.length > 1 && <p className="search-help search-sort-help">{l("sortHelp")}</p>}
+			{editing && (
+				<p id="search-sort-help" className="sr-only">
+					{l("sortHelp")}
+				</p>
+			)}
 			<DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
 				<SortableContext items={items.map((item) => item.id)} strategy={rectSortingStrategy}>
 					<ul className={`search-bookmarks search-bookmarks-${settings.layoutDirection}`} style={style}>

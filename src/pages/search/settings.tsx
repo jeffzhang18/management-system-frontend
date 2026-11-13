@@ -1,9 +1,10 @@
+import { GlassInput, GlassSwitch } from "@zakisheriff/liquid-glass";
 import { useState } from "react";
-import type { Engine, SearchSettings } from "@/api/services/searchService";
-import searchService from "@/api/services/searchService";
+import searchService, { type SearchSettings } from "@/api/services/searchService";
 import { GlassAction, GlassPanel } from "../subscriptions/glass";
-import { defaults, errorMessage, settingsPatch, validUrl } from "./logic";
-import { OnlineImage, SearchSheet, useLabels } from "./shared";
+import { defaults, errorMessage, settingsPatch, validGradient, validUrl } from "./logic";
+import { EngineSelect, OnlineImage, SearchSelect, SearchSheet, SearchSlider, useLabels } from "./shared";
+
 export function Settings({
 	saved,
 	draft,
@@ -18,7 +19,7 @@ export function Settings({
 	onSaved: (s: SearchSettings) => void;
 }) {
 	const l = useLabels();
-	const [original] = useState(saved);
+	const [original] = useState(() => ({ ...defaults, ...saved }));
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState("");
 	const [preview, setPreview] = useState("");
@@ -28,6 +29,10 @@ export function Settings({
 		draft.backgroundMode === "online" &&
 		(draft.wallpaperUrl !== original.wallpaperUrl || original.backgroundMode !== "online");
 	const save = async () => {
+		if (!validGradient(draft)) {
+			setError(l("invalidGradient"));
+			return;
+		}
 		if (changedImage && (!validUrl(draft.wallpaperUrl || "", true) || verified !== draft.wallpaperUrl)) {
 			setError(l("verifyImage"));
 			return;
@@ -43,39 +48,120 @@ export function Settings({
 		}
 	};
 	return (
-		<SearchSheet title={l("settings")} close={() => !busy && close()}>
-			<GlassPanel className="search-settings-material">
-				<div className="search-fields">
-					<label>
-						{l("defaultEngine")}
-						<select value={draft.defaultEngine} onChange={(e) => patch({ defaultEngine: e.target.value as Engine })}>
-							<option value="google">Google</option>
-							<option value="baidu">{l("baidu")}</option>
-							<option value="bing">Bing</option>
-						</select>
-					</label>
+		<SearchSheet
+			title={l("settings")}
+			close={() => !busy && close()}
+			footer={
+				<>
+					<button type="button" disabled={busy} onClick={close}>
+						{l("cancel")}
+					</button>
+					<GlassAction disabled={busy} onClick={save}>
+						{busy ? l("saving") : l("save")}
+					</GlassAction>
+				</>
+			}
+		>
+			<fieldset className="search-form" disabled={busy}>
+				<GlassPanel className="search-fields search-section" radius="20px">
+					<h3>{l("searchBehavior")}</h3>
+					<div className="search-field">
+						<span>{l("defaultEngine")}</span>
+						<EngineSelect value={draft.defaultEngine} onChange={(defaultEngine) => patch({ defaultEngine })} />
+					</div>
 					<label className="search-check">
-						<input
-							type="checkbox"
+						<span>{l("newTab")}</span>
+						<GlassSwitch
+							intensity={1}
+							tint="var(--primary)"
+							aria-label={l("newTab")}
 							checked={draft.openInNewTab}
-							onChange={(e) => patch({ openInNewTab: e.target.checked })}
+							onChange={(openInNewTab) => patch({ openInNewTab })}
 						/>
-						{l("newTab")}
 					</label>
+				</GlassPanel>
+				<GlassPanel className="search-fields search-section" radius="20px">
 					<h3>{l("wallpaper")}</h3>
-					<select
-						aria-label={l("wallpaper")}
+					<SearchSelect
+						label={l("wallpaper")}
 						value={draft.backgroundMode}
-						onChange={(e) => patch({ backgroundMode: e.target.value as "default" | "online" })}
-					>
-						<option value="default">{l("gradient")}</option>
-						<option value="online">{l("online")}</option>
-					</select>
+						onChange={(backgroundMode) => patch({ backgroundMode })}
+						options={[
+							{ value: "default", label: l("whiteBackground") },
+							{ value: "gradient", label: l("gradient") },
+							{ value: "online", label: l("online") },
+						]}
+					/>
+					{draft.backgroundMode === "gradient" && (
+						<>
+							<div className="search-colors">
+								{(["gradientFrom", "gradientTo"] as const).map((key) => (
+									<div className="search-field" key={key}>
+										<span>{l(key)}</span>
+										<div className="search-color-control">
+											<input
+												type="color"
+												aria-label={l(key)}
+												value={/^#[\da-f]{6}$/i.test(draft[key]) ? draft[key] : defaults[key]}
+												onChange={(e) => patch({ [key]: e.target.value })}
+											/>
+											<GlassInput
+												intensity={1}
+												aria-label={`${l(key)} HEX`}
+												maxLength={7}
+												value={draft[key]}
+												onChange={(e) => patch({ [key]: e.target.value })}
+												aria-invalid={!/^#[\da-f]{6}$/i.test(draft[key])}
+											/>
+										</div>
+									</div>
+								))}
+							</div>
+							<SearchSelect
+								label={l("gradientDirection")}
+								value={String(draft.gradientAngle)}
+								onChange={(angle) => patch({ gradientAngle: Number(angle) })}
+								options={[
+									{ value: "0", label: l("toTop") },
+									{ value: "90", label: l("toRight") },
+									{ value: "180", label: l("toBottom") },
+									{ value: "270", label: l("toLeft") },
+									{ value: "135", label: l("diagonal") },
+									...(![0, 90, 180, 270, 135].includes(draft.gradientAngle)
+										? [{ value: String(draft.gradientAngle), label: `${draft.gradientAngle}°` }]
+										: []),
+								]}
+							/>
+							<label>
+								{l("gradientAngle")} <output>{draft.gradientAngle}°</output>
+								<SearchSlider
+									intensity={1}
+									min={0}
+									max={359}
+									step={1}
+									value={draft.gradientAngle}
+									aria-label={l("gradientAngle")}
+									onChange={(gradientAngle) => patch({ gradientAngle })}
+								/>
+							</label>
+							<div
+								className="search-gradient-preview"
+								aria-label={l("backgroundPreview")}
+								style={{
+									background: validGradient(draft)
+										? `linear-gradient(${draft.gradientAngle}deg, ${draft.gradientFrom}, ${draft.gradientTo})`
+										: undefined,
+								}}
+							/>
+						</>
+					)}
 					{draft.backgroundMode === "online" && (
 						<>
-							<label>
-								{l("imageUrl")}
-								<input
+							<div className="search-field">
+								<span>{l("imageUrl")}</span>
+								<GlassInput
+									aria-label={l("imageUrl")}
+									intensity={1}
 									type="url"
 									maxLength={2048}
 									value={draft.wallpaperUrl || ""}
@@ -86,7 +172,7 @@ export function Settings({
 									}}
 									placeholder="https://…"
 								/>
-							</label>
+							</div>
 							<button
 								type="button"
 								onClick={() => {
@@ -115,65 +201,80 @@ export function Settings({
 							<button type="button" onClick={() => patch({ wallpaperUrl: null, backgroundMode: "default" })}>
 								{l("removeImage")}
 							</button>
+							<label>
+								{l("overlayOpacity")} <output>{draft.overlayOpacity}</output>
+								<SearchSlider
+									intensity={1}
+									min={0}
+									max={0.85}
+									step={0.01}
+									value={draft.overlayOpacity}
+									aria-label={l("overlayOpacity")}
+									onChange={(overlayOpacity) => patch({ overlayOpacity })}
+								/>
+							</label>
 						</>
 					)}
+				</GlassPanel>
+				<GlassPanel className="search-fields search-section" radius="20px">
+					<h3>{l("bookmarkLayout")}</h3>
 					{(
 						[
-							["overlayOpacity", 0, 0.85, 0.01],
-							["iconSize", 40, 112, 1],
-							["gap", 8, 48, 1],
-							["radius", 0, draft.iconSize / 2, 1],
-							["itemsPerLine", 1, 12, 1],
+							["iconSize", 40, 112],
+							["gap", 8, 48],
+							["radius", 0, Math.floor(draft.iconSize / 2)],
+							["itemsPerLine", 1, 12],
 						] as const
-					).map(([key, min, max, step]) => (
+					).map(([key, min, max]) => (
 						<label key={key}>
 							{l(key)} <output>{draft[key]}</output>
-							<input
-								type="range"
+							<SearchSlider
+								intensity={1}
 								min={min}
 								max={max}
-								step={step}
+								step={1}
 								value={draft[key]}
-								onChange={(e) => {
-									const value = Number(e.target.value);
+								aria-label={l(key)}
+								onChange={(value) =>
 									patch(
 										key === "iconSize"
-											? { iconSize: value, radius: Math.min(draft.radius, value / 2) }
+											? { iconSize: value, radius: Math.min(draft.radius, Math.floor(value / 2)) }
 											: { [key]: value },
-									);
-								}}
+									)
+								}
 							/>
 						</label>
 					))}
-					<label>
-						{l("direction")}
-						<select
+					<div className="search-field">
+						<span>{l("direction")}</span>
+						<SearchSelect
+							label={l("direction")}
 							value={draft.layoutDirection}
-							onChange={(e) => patch({ layoutDirection: e.target.value as "row" | "column" })}
-						>
-							<option value="row">{l("row")}</option>
-							<option value="column">{l("column")}</option>
-						</select>
-					</label>
+							onChange={(layoutDirection) => patch({ layoutDirection })}
+							options={[
+								{ value: "row", label: l("row") },
+								{ value: "column", label: l("column") },
+							]}
+						/>
+					</div>
 					<p className="search-help">{l("responsive")}</p>
-					<button type="button" onClick={() => setDraft({ ...defaults, version: draft.version })}>
-						{l("reset")}
-					</button>
-				</div>
-			</GlassPanel>
-			{error && (
-				<p role="alert" className="search-error">
-					{error}
-				</p>
-			)}
-			<div className="search-footer">
-				<button type="button" disabled={busy} onClick={close}>
-					{l("cancel")}
+				</GlassPanel>
+				<button
+					className="search-reset"
+					type="button"
+					onClick={() => {
+						setDraft({ ...defaults, version: draft.version });
+						setError("");
+					}}
+				>
+					{l("reset")}
 				</button>
-				<GlassAction disabled={busy} onClick={save}>
-					{busy ? l("saving") : l("save")}
-				</GlassAction>
-			</div>
+				{error && (
+					<p role="alert" className="search-error">
+						{error}
+					</p>
+				)}
+			</fieldset>
 		</SearchSheet>
 	);
 }

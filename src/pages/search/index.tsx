@@ -1,16 +1,18 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { GlassInput, GlassSwitch } from "@zakisheriff/liquid-glass";
 import { Clock3, Pencil, Search, Settings2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import searchService, { type Bookmark, type Engine, type SearchSettings } from "@/api/services/searchService";
 import { useUserInfo } from "@/store/userStore";
 import { GlassAction, GlassPanel } from "../subscriptions/glass";
 import { BookmarkEditor } from "./bookmark-editor";
 import { Bookmarks } from "./bookmarks";
 import { History } from "./history";
-import { canSubmit, defaults, move, SearchAttempt, validUrl } from "./logic";
-import { OnlineImage, useLabels } from "./shared";
+import { canSubmit, defaults, lightGradient, move, SearchAttempt, validGradient, validUrl } from "./logic";
 import { Settings } from "./settings";
-import { recordThenNavigate } from "./submission";
+import { EngineSelect, OnlineImage, useLabels } from "./shared";
+import { recordThenNavigate, resolveSearch } from "./submission";
 import "./search.css";
 export default function SearchPage() {
 	const user = useUserInfo();
@@ -23,13 +25,17 @@ function SearchContent({ userId }: { userId?: string }) {
 	const settings = useQuery({ queryKey: [...key, "settings"], queryFn: searchService.settings, retry: false });
 	const bookmarks = useQuery({ queryKey: [...key, "bookmarks"], queryFn: searchService.bookmarks, retry: false });
 	const [draft, setDraft] = useState<SearchSettings | null>(null);
-	const effective = draft || settings.data || defaults;
+	const effective = { ...defaults, ...(draft || settings.data) };
+	const gradient = validGradient(effective) ? effective : defaults;
+	const light =
+		effective.backgroundMode === "default" || (effective.backgroundMode === "gradient" && lightGradient(gradient));
 	const [query, setQuery] = useState("");
 	const [engine, setEngine] = useState<Engine>("google");
 	const [editing, setEditing] = useState(false);
 	const [editor, setEditor] = useState<Bookmark | "new" | null>(null);
 	const [history, setHistory] = useState(false);
 	const [pending, setPending] = useState(false);
+	const [incognito, setIncognito] = useState(false);
 	const [mutation, setMutation] = useState(false);
 	const [error, setError] = useState("");
 	const [searchFailed, setSearchFailed] = useState(false);
@@ -41,6 +47,7 @@ function SearchContent({ userId }: { userId?: string }) {
 	const input = useRef<HTMLInputElement>(null);
 	const alive = useRef(true);
 	const reserved = useRef<Window | null>(null);
+	const savedDefaultEngine = settings.data?.defaultEngine;
 	useEffect(() => {
 		alive.current = true;
 		return () => {
@@ -49,8 +56,8 @@ function SearchContent({ userId }: { userId?: string }) {
 		};
 	}, []);
 	useEffect(() => {
-		if (settings.data) setEngine(settings.data.defaultEngine);
-	}, [settings.data?.defaultEngine]);
+		if (savedDefaultEngine) setEngine(savedDefaultEngine);
+	}, [savedDefaultEngine]);
 	const submit = async (text = query, selected = engine, retry = false) => {
 		if (!canSubmit(text, composing.current, submitting.current)) return;
 		const q = text.trim();
@@ -65,14 +72,14 @@ function SearchContent({ userId }: { userId?: string }) {
 		if (popup) popup.opener = null;
 		try {
 			const target = await recordThenNavigate({
-				record: () => searchService.search(q, selected, requestId),
+				record: () => resolveSearch(q, selected, incognito, () => searchService.search(q, selected, requestId)),
 				popup,
 				newTab: effective.openInNewTab,
 				navigate: (url) => window.location.assign(url),
 				active: () => alive.current,
 			});
 			if (alive.current) {
-				client.invalidateQueries({ queryKey: [...key, "history"] });
+				if (!incognito) client.invalidateQueries({ queryKey: [...key, "history"] });
 				if (target) setFallback(target);
 			}
 		} catch {
@@ -103,17 +110,56 @@ function SearchContent({ userId }: { userId?: string }) {
 	};
 	const items = bookmarks.data?.items || [];
 	return (
-		<section className="search-page" aria-label={l("pageTitle")}>
+		<section
+			className="search-page"
+			data-tone={light ? "light" : "dark"}
+			aria-label={l("pageTitle")}
+			style={{
+				background:
+					effective.backgroundMode === "gradient"
+						? `linear-gradient(${gradient.gradientAngle}deg, ${gradient.gradientFrom}, ${gradient.gradientTo})`
+						: effective.backgroundMode === "online"
+							? "#172033"
+							: "#fff",
+			}}
+		>
+			<Helmet>
+				<title>{l("pageTitle")}</title>
+			</Helmet>
 			{effective.backgroundMode === "online" && effective.wallpaperUrl && validUrl(effective.wallpaperUrl, true) && (
 				<OnlineImage key={effective.wallpaperUrl} url={effective.wallpaperUrl} alt="" className="search-wallpaper" />
 			)}
-			<div className="search-shade" style={{ opacity: effective.overlayOpacity }} />
+			{effective.backgroundMode === "online" && (
+				<div className="search-shade" style={{ opacity: effective.overlayOpacity }} />
+			)}
 			<div className="search-content">
 				<div className="search-toolbar">
-					<button title={l("history")} aria-label={l("history")} onClick={() => setHistory(true)}>
+					<label className="search-incognito" htmlFor="search-incognito-toggle" title={l("incognitoHelp")}>
+						<span>{l("incognito")}</span>
+						<GlassSwitch
+							id="search-incognito-toggle"
+							intensity={1}
+							tint="var(--primary)"
+							aria-label={l("incognito")}
+							aria-describedby="search-incognito-help"
+							checked={incognito}
+							disabled={pending}
+							onChange={(value) => {
+								setIncognito(value);
+								setFallback("");
+								setSearchFailed(false);
+								setError("");
+							}}
+						/>
+					</label>
+					<span id="search-incognito-help" className="sr-only">
+						{l("incognitoHelp")}
+					</span>
+					<button type="button" title={l("history")} aria-label={l("history")} onClick={() => setHistory(true)}>
 						<Clock3 size={20} />
 					</button>
 					<button
+						type="button"
 						title={l("editBookmarks")}
 						aria-label={l("editBookmarks")}
 						aria-pressed={editing}
@@ -122,10 +168,11 @@ function SearchContent({ userId }: { userId?: string }) {
 						<Pencil size={19} />
 					</button>
 					<button
+						type="button"
 						disabled={!settings.data}
 						title={l("settings")}
 						aria-label={l("settings")}
-						onClick={() => setDraft({ ...settings.data! })}
+						onClick={() => settings.data && setDraft({ ...defaults, ...settings.data })}
 					>
 						<Settings2 size={20} />
 					</button>
@@ -139,24 +186,27 @@ function SearchContent({ userId }: { userId?: string }) {
 								submit();
 							}}
 						>
-							<select
-								aria-label={l("engine")}
+							<EngineSelect
 								value={engine}
 								disabled={pending}
-								onChange={(e) => {
-									setEngine(e.target.value as Engine);
+								className="search-engine"
+								onChange={(value) => {
+									setEngine(value);
 									setSearchFailed(false);
 								}}
-							>
-								<option value="google">Google</option>
-								<option value="baidu">{l("baidu")}</option>
-								<option value="bing">Bing</option>
-							</select>
-							<input
+							/>
+							<GlassInput
+								className="search-query"
+								intensity={1}
+								tint="var(--primary)"
 								ref={input}
 								aria-label={l("query")}
 								placeholder={l("placeholder")}
 								value={query}
+								onClear={() => {
+									setQuery("");
+									setSearchFailed(false);
+								}}
 								maxLength={1000}
 								disabled={pending}
 								onChange={(e) => {
@@ -185,24 +235,25 @@ function SearchContent({ userId }: { userId?: string }) {
 					<div role="alert" className="search-status search-error">
 						{error}
 						{searchFailed && (
-							<button disabled={pending} onClick={() => submit(query, engine, true)}>
+							<button type="button" disabled={pending} onClick={() => submit(query, engine, true)}>
 								{l("retry")}
 							</button>
 						)}
 					</div>
 				)}
 				{fallback && (
-					<div role="status" className="search-status">
+					<output className="search-status">
 						{l("popupBlocked")}{" "}
 						<a href={fallback} target="_blank" rel="noopener noreferrer">
 							{l("openResults")}
 						</a>
-					</div>
+					</output>
 				)}
 				{(settings.isError || bookmarks.isError) && (
 					<div className="search-status" role="alert">
 						{l("loadFailed")}
 						<button
+							type="button"
 							onClick={() => {
 								settings.refetch();
 								bookmarks.refetch();
@@ -213,9 +264,7 @@ function SearchContent({ userId }: { userId?: string }) {
 					</div>
 				)}
 				{bookmarks.isPending ? (
-					<p role="status" className="search-empty">
-						{l("loading")}
-					</p>
+					<output className="search-empty">{l("loading")}</output>
 				) : (
 					<Bookmarks
 						items={items}
@@ -233,10 +282,14 @@ function SearchContent({ userId }: { userId?: string }) {
 						<p>
 							{l("confirmDelete")} {deleteItem.name}
 						</p>
-						<button disabled={mutation} onClick={() => mutate(() => searchService.deleteBookmark(deleteItem.id))}>
+						<button
+							type="button"
+							disabled={mutation}
+							onClick={() => mutate(() => searchService.deleteBookmark(deleteItem.id))}
+						>
 							{l("delete")}
 						</button>
-						<button disabled={mutation} onClick={() => setDeleteItem(null)}>
+						<button type="button" disabled={mutation} onClick={() => setDeleteItem(null)}>
 							{l("cancel")}
 						</button>
 					</div>

@@ -38,7 +38,7 @@ const Main = () => {
 			<main
 				data-slot="slash-layout-main"
 				className={cn(
-					"flex-auto w-full flex flex-col",
+					"flex-auto w-full min-w-0 flex flex-col",
 					"transition-[max-width] duration-300 ease-in-out",
 					pathname === "/search" ? "p-0 max-w-full" : "px-4 pt-[6px] pb-4 sm:px-6 sm:pt-[14px] sm:pb-6 md:px-8 mx-auto",
 					{

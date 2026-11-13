@@ -1,5 +1,24 @@
-import type { SearchResult } from "@/api/services/searchService";
+import type { Engine, SearchResult } from "@/api/services/searchService";
 import { validUrl } from "./logic";
+
+/** Private searches never send the query to the application's history endpoint. */
+export function resolveSearch(
+	query: string,
+	engine: Engine,
+	incognito: boolean,
+	record: () => Promise<SearchResult>,
+): Promise<{ targetUrl: string }> {
+	if (!incognito) return record();
+	const destinations: Record<Engine, [string, string]> = {
+		google: ["https://www.google.com/search", "q"],
+		baidu: ["https://www.baidu.com/s", "wd"],
+		bing: ["https://www.bing.com/search", "q"],
+	};
+	const [base, parameter] = destinations[engine];
+	const target = new URL(base);
+	target.searchParams.set(parameter, query.trim());
+	return Promise.resolve({ targetUrl: target.href });
+}
 export interface ReservedWindow {
 	closed: boolean;
 	close: () => void;
@@ -13,7 +32,7 @@ export async function recordThenNavigate({
 	navigate,
 	active,
 }: {
-	record: () => Promise<SearchResult>;
+	record: () => Promise<{ targetUrl: string }>;
 	popup: ReservedWindow | null;
 	newTab: boolean;
 	navigate: (url: string) => void;

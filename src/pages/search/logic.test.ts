@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	canSubmit,
+	bookmarkGrid,
 	defaults,
 	errorMessage,
 	metadataCurrent,
@@ -9,9 +10,73 @@ import {
 	safeIcon,
 	settingsPatch,
 	validUrl,
+	normalizeWebsiteUrl,
+	validGradient,
+	lightGradient,
 } from "./logic";
 
 describe("search page logic", () => {
+	it("normalizes bare website hosts without relaxing image validation", () => {
+		expect(normalizeWebsiteUrl(" bing.com ")).toBe("https://bing.com/");
+		expect(normalizeWebsiteUrl("www.bing.com/search?q=a%20b")).toBe("https://www.bing.com/search?q=a%20b");
+		expect(normalizeWebsiteUrl("http://example.com/path?a=1#hash")).toBe("http://example.com/path?a=1#hash");
+		expect(normalizeWebsiteUrl("http://intranet:8080")).toBe("http://intranet:8080/");
+		expect(normalizeWebsiteUrl("bing.com:8443/path")).toBe("https://bing.com:8443/path");
+		for (const value of [
+			"",
+			"not a url",
+			"hello",
+			"javascript:alert(1)",
+			"data:text/html,a",
+			"ftp://a.com",
+			"//bing.com",
+			"https://user:pass@bing.com",
+			"https:bing.com",
+		]) {
+			expect(normalizeWebsiteUrl(value)).toBeNull();
+		}
+		expect(validUrl("bing.com/icon.png", true)).toBeNull();
+	});
+
+	it("fits row and column layouts to container width including editing controls", () => {
+		const settings = { ...defaults, iconSize: 112, gap: 48, itemsPerLine: 12 };
+		for (const width of [288, 351, 366, 406, 440, 720, 960, 1280]) {
+			for (const mobile of [true, false]) {
+				for (const editing of [true, false]) {
+					for (const direction of ["row", "column"] as const) {
+						const grid = bookmarkGrid(width, 27, { ...settings, layoutDirection: direction }, mobile, editing);
+						expect(grid.columns * grid.cell + (grid.columns - 1) * grid.gap).toBeLessThanOrEqual(width);
+						if (grid.column) expect(grid.columns * grid.rows!).toBeGreaterThanOrEqual(27);
+						if (mobile) expect(grid.column).toBe(false);
+					}
+				}
+			}
+		}
+		expect(bookmarkGrid(900, 3, defaults, false, false).columns).toBe(3);
+	});
+	it("preserves grid geometry when bookmark organization is toggled", () => {
+		for (const width of [288, 351, 406, 720, 960, 1280]) {
+			for (const mobile of [true, false]) {
+				for (const direction of ["row", "column"] as const) {
+					for (const iconSize of [40, 72, 112]) {
+						const settings = { ...defaults, iconSize, layoutDirection: direction, gap: 48, itemsPerLine: 12 };
+						expect(bookmarkGrid(width, 27, settings, mobile, true)).toEqual(
+							bookmarkGrid(width, 27, settings, mobile, false),
+						);
+					}
+				}
+			}
+		}
+	});
+
+	it("validates gradients and chooses a foreground for bright and dark colors", () => {
+		expect(validGradient(defaults)).toBe(true);
+		expect(validGradient({ ...defaults, gradientFrom: "red" })).toBe(false);
+		expect(validGradient({ ...defaults, gradientAngle: 360 })).toBe(false);
+		expect(validGradient({ ...defaults, gradientAngle: 0.5 })).toBe(false);
+		expect(lightGradient(defaults)).toBe(false);
+		expect(lightGradient({ ...defaults, gradientFrom: "#ffffff", gradientTo: "#e8f0ff" })).toBe(true);
+	});
 	it("accepts only credential-free HTTP(S) links and HTTPS images", () => {
 		expect(validUrl(" https://example.com ")).toBe("https://example.com/");
 		expect(validUrl("http://example.com")).toBe("http://example.com/");
@@ -61,7 +126,20 @@ describe("search page logic", () => {
 		expect(settingsPatch(original, { ...original })).toEqual({ version: 3 });
 		expect(settingsPatch(original, { ...original, gap: 32, wallpaperUrl: "  " })).toEqual({ version: 3, gap: 32 });
 		expect(
-			settingsPatch(original, { ...defaults, version: 0, backgroundMode: "online", wallpaperUrl: "https://a.com/w.jpg" }),
+			settingsPatch(original, { ...original, backgroundMode: "gradient", gradientFrom: "#abcdef", gradientAngle: 90 }),
+		).toEqual({
+			version: 3,
+			backgroundMode: "gradient",
+			gradientFrom: "#abcdef",
+			gradientAngle: 90,
+		});
+		expect(
+			settingsPatch(original, {
+				...defaults,
+				version: 0,
+				backgroundMode: "online",
+				wallpaperUrl: "https://a.com/w.jpg",
+			}),
 		).toEqual({ version: 3, backgroundMode: "online", wallpaperUrl: "https://a.com/w.jpg" });
 	});
 

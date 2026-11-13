@@ -43,7 +43,28 @@ export function History({
 	};
 	const items = history.data?.pages.flatMap((page) => page.items) ?? [];
 	return (
-		<SearchSheet title={l("history")} close={() => !busy && close()}>
+		<SearchSheet
+			title={l("history")}
+			close={() => !busy && close()}
+			footer={
+				items.length > 0 &&
+				(confirming ? (
+					<>
+						<p className="search-help">{l("confirmClear")}</p>
+						<button type="button" disabled={busy} onClick={() => setConfirming(false)}>
+							{l("cancel")}
+						</button>
+						<button type="button" disabled={busy} onClick={() => run(() => searchService.clearHistory())}>
+							{l("confirm")}
+						</button>
+					</>
+				) : (
+					<button type="button" disabled={busy} onClick={() => setConfirming(true)}>
+						{l("clearHistory")}
+					</button>
+				))
+			}
+		>
 			<p className="search-help">{l("historyHelp")}</p>
 			{history.isPending ? (
 				<p role="status" className="search-empty">
@@ -104,25 +125,6 @@ export function History({
 				<p role="alert" className="search-error">
 					{error}
 				</p>
-			)}
-			{items.length > 0 && (
-				<div className="search-footer">
-					{confirming ? (
-						<>
-							<p className="search-help">{l("confirmClear")}</p>
-							<button type="button" disabled={busy} onClick={() => setConfirming(false)}>
-								{l("cancel")}
-							</button>
-							<button type="button" disabled={busy} onClick={() => run(() => searchService.clearHistory())}>
-								{l("confirm")}
-							</button>
-						</>
-					) : (
-						<button type="button" disabled={busy} onClick={() => setConfirming(true)}>
-							{l("clearHistory")}
-						</button>
-					)}
-				</div>
 			)}
 		</SearchSheet>
 	);

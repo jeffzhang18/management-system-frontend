@@ -5,6 +5,9 @@ export const defaults: SearchSettings = Object.freeze({
 	defaultEngine: "google" as Engine,
 	openInNewTab: true,
 	backgroundMode: "default" as const,
+	gradientFrom: "#1e3a8a",
+	gradientTo: "#6d28d9",
+	gradientAngle: 135,
 	wallpaperUrl: null,
 	overlayOpacity: 0.3,
 	iconSize: 72,
@@ -16,6 +19,61 @@ export const defaults: SearchSettings = Object.freeze({
 
 const MAX_QUERY = 1000;
 const MAX_URL = 2048;
+
+/** Only website entry accepts bare hosts; image validation remains strict. */
+export function normalizeWebsiteUrl(value: string): string | null {
+	const text = value.trim();
+	if (!text || /\s/.test(text)) return null;
+	const explicit = /^[a-z][a-z\d+.-]*:/i.test(text) && !/^[a-z\d.-]+:\d+(?:[/?#]|$)/i.test(text);
+	const candidate = explicit ? text : `https://${text}`;
+	if (!/^https?:\/\//i.test(candidate) || text.startsWith("//")) return null;
+	const result = validUrl(candidate);
+	if (!result) return null;
+	if (explicit) return result;
+	const host = new URL(result).hostname;
+	return host.includes(".") || host === "localhost" || host.startsWith("[") ? result : null;
+}
+
+export function bookmarkGrid(
+	width: number,
+	total: number,
+	settings: SearchSettings,
+	mobile: boolean,
+	_editing: boolean,
+) {
+	const icon = mobile ? Math.min(settings.iconSize, 56) : settings.iconSize;
+	const gap = mobile ? Math.min(settings.gap, 16) : settings.gap;
+	const cell = icon + (mobile ? 16 : 24);
+	const capacity = Math.max(1, Math.floor((width + gap) / (cell + gap)));
+	const column = !mobile && settings.layoutDirection === "column";
+	const rows = column ? Math.max(settings.itemsPerLine, Math.ceil(total / capacity)) : undefined;
+	const columns = column
+		? Math.max(1, Math.ceil(total / (rows || 1)))
+		: Math.max(1, Math.min(capacity, settings.itemsPerLine, total));
+	return { icon, gap, cell, rows, columns, column };
+}
+
+export function validGradient(settings: SearchSettings) {
+	return (
+		/^#[\da-f]{6}$/i.test(settings.gradientFrom) &&
+		/^#[\da-f]{6}$/i.test(settings.gradientTo) &&
+		Number.isInteger(settings.gradientAngle) &&
+		settings.gradientAngle >= 0 &&
+		settings.gradientAngle <= 359
+	);
+}
+
+/** WCAG relative luminance lets light gradients use a readable dark foreground. */
+export function lightGradient(settings: SearchSettings) {
+	const luminance = (hex: string) => {
+		const rgb = [1, 3, 5].map((offset) => {
+			const channel = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+			return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+		});
+		return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+	};
+	return Math.min(luminance(settings.gradientFrom), luminance(settings.gradientTo)) > 0.4;
+}
 
 /** Returns the normalized URL when it is a credential-free HTTP(S) link, HTTPS only for images. */
 export function validUrl(value: unknown, image = false): string | null {
@@ -68,6 +126,9 @@ const SETTING_KEYS = [
 	"defaultEngine",
 	"openInNewTab",
 	"backgroundMode",
+	"gradientFrom",
+	"gradientTo",
+	"gradientAngle",
 	"wallpaperUrl",
 	"overlayOpacity",
 	"iconSize",

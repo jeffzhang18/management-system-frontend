@@ -24,7 +24,7 @@ export default function DashboardLayout() {
 			{isVertical && <NavVerticalLayout data={navData} />}
 
 			<div
-				className="relative w-full min-h-screen flex flex-col transition-[padding] duration-300 ease-in-out"
+				className="relative w-full min-w-0 min-h-screen flex flex-col transition-[padding] duration-300 ease-in-out"
 				style={{ paddingLeft: contentPaddingLeft }}
 			>
 				<Header leftSlot={isMobile ? <NavMobileLayout data={navData} /> : isHorizontal ? <Logo /> : undefined} />

@@ -5,7 +5,10 @@ export interface SearchSettings {
 	version: number;
 	defaultEngine: Engine;
 	openInNewTab: boolean;
-	backgroundMode: "default" | "online";
+	backgroundMode: "default" | "gradient" | "online";
+	gradientFrom: string;
+	gradientTo: string;
+	gradientAngle: number;
 	wallpaperUrl: string | null;
 	overlayOpacity: number;
 	iconSize: number;

@@ -1,10 +1,47 @@
 import { describe, expect, it, vi } from "vitest";
-import { recordThenNavigate } from "./submission";
+import { recordThenNavigate, resolveSearch } from "./submission";
+
 const result = { historyId: "1", targetUrl: "https://www.google.com/search?q=test", createdAt: "2026-11-11" };
 function popup() {
 	return { closed: false, close: vi.fn(), location: { replace: vi.fn() } };
 }
 describe("record before navigation", () => {
+	it("bypasses history entirely for private searches across all engines", async () => {
+		const record = vi.fn(async () => result);
+		for (const engine of ["google", "bing", "baidu"] as const) {
+			const window = popup();
+			await recordThenNavigate({
+				record: () => resolveSearch(" 中文 & #? ", engine, true, record),
+				popup: window,
+				newTab: true,
+				navigate: vi.fn(),
+				active: () => true,
+			});
+			const target = new URL(window.location.replace.mock.calls[0][0]);
+			expect(target.hostname).toBe(`www.${engine}.com`);
+			expect(target.searchParams.get(engine === "baidu" ? "wd" : "q")).toBe("中文 & #?");
+		}
+		expect(record).not.toHaveBeenCalled();
+	});
+	it("resumes recording after private search is disabled", async () => {
+		const record = vi.fn(async () => result);
+		await resolveSearch("private", "google", true, record);
+		expect(record).not.toHaveBeenCalled();
+		expect(await resolveSearch("normal", "google", false, record)).toEqual(result);
+		expect(record).toHaveBeenCalledOnce();
+	});
+	it("returns private results when a popup is blocked without persisting a record", async () => {
+		const record = vi.fn(async () => result);
+		const target = await recordThenNavigate({
+			record: () => resolveSearch("private", "bing", true, record),
+			popup: null,
+			newTab: true,
+			navigate: vi.fn(),
+			active: () => true,
+		});
+		expect(target).toBe("https://www.bing.com/search?q=private");
+		expect(record).not.toHaveBeenCalled();
+	});
 	it("does not navigate until persistence resolves", async () => {
 		let resolve!: (r: typeof result) => void;
 		const saved = new Promise<typeof result>((r) => {
