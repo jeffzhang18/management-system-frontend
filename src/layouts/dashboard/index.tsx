@@ -2,6 +2,7 @@ import { ThemeLayout } from "#/enum";
 import Logo from "@/components/logo";
 import { down, useMediaQuery } from "@/hooks";
 import { useSettings } from "@/store/settingStore";
+import { useSettingsSync } from "@/store/use-settings-sync";
 import Header from "./header";
 import Main from "./main";
 import { MobileBottomNav } from "./mobile-bottom-nav";
@@ -10,6 +11,7 @@ import { NavHorizontalLayout, NavMobileLayout, NavVerticalLayout, useFilteredNav
 export default function DashboardLayout() {
 	const isMobile = useMediaQuery(down("md"));
 	const { themeLayout } = useSettings();
+	useSettingsSync();
 	const navData = useFilteredNavData();
 	const isHorizontal = !isMobile && themeLayout === ThemeLayout.Horizontal;
 	const isVertical = !isMobile && !isHorizontal;
