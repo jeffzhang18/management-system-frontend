@@ -3,7 +3,9 @@ import { GlassInput, GlassSwitch } from "@zakisheriff/liquid-glass";
 import { Clock3, Pencil, Search, Settings2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { ThemeMode } from "#/enum";
 import searchService, { type Bookmark, type Engine, type SearchSettings } from "@/api/services/searchService";
+import { useSettings } from "@/store/settingStore";
 import { useUserInfo } from "@/store/userStore";
 import { GlassAction, GlassPanel } from "../subscriptions/glass";
 import { BookmarkEditor } from "./bookmark-editor";
@@ -27,8 +29,10 @@ function SearchContent({ userId }: { userId?: string }) {
 	const [draft, setDraft] = useState<SearchSettings | null>(null);
 	const effective = { ...defaults, ...(draft || settings.data) };
 	const gradient = validGradient(effective) ? effective : defaults;
-	const light =
-		effective.backgroundMode === "default" || (effective.backgroundMode === "gradient" && lightGradient(gradient));
+	const { themeMode } = useSettings();
+	const solid = effective.backgroundMode === "default";
+	const solidDark = solid && themeMode === ThemeMode.Dark;
+	const light = solid ? !solidDark : effective.backgroundMode === "gradient" && lightGradient(gradient);
 	const [query, setQuery] = useState("");
 	const [engine, setEngine] = useState<Engine>("google");
 	const [editing, setEditing] = useState(false);
@@ -113,6 +117,7 @@ function SearchContent({ userId }: { userId?: string }) {
 		<section
 			className="search-page"
 			data-tone={light ? "light" : "dark"}
+			data-solid={solidDark ? "dark" : undefined}
 			aria-label={l("pageTitle")}
 			style={{
 				background:
@@ -120,7 +125,9 @@ function SearchContent({ userId }: { userId?: string }) {
 						? `linear-gradient(${gradient.gradientAngle}deg, ${gradient.gradientFrom}, ${gradient.gradientTo})`
 						: effective.backgroundMode === "online"
 							? "#172033"
-							: "#fff",
+							: solidDark
+								? "#161c24"
+								: "#fff",
 			}}
 		>
 			<Helmet>

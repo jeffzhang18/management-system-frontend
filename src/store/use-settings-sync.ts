@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
 import uiSettingsService, { type UiSettingsPayload } from "@/api/services/uiSettingsService";
+import { applyLocaleSetting, getCurrentLocale, isLocale } from "@/locales/use-locale";
 import { useSettingActions, useSettings } from "@/store/settingStore";
 import { useUserInfo } from "@/store/userStore";
 
 const KEYS = [
 	"themeColorPresets",
 	"themeMode",
+	"themeFollowSystem",
 	"themeLayout",
 	"themeStretch",
 	"breadCrumb",
@@ -44,6 +46,13 @@ export function useSettingsSync() {
 		uiSettingsService
 			.get()
 			.then(async ({ settings: remote }) => {
+				if (cancelled) return;
+				const remoteLanguage = remote?.language;
+				if (isLocale(remoteLanguage)) {
+					if (remoteLanguage !== getCurrentLocale()) applyLocaleSetting(remoteLanguage);
+				} else {
+					await uiSettingsService.save({ language: getCurrentLocale() }).catch(() => {});
+				}
 				if (cancelled) return;
 				if (remote && Object.keys(remote).length > 0) {
 					const merged = { ...latest.current, ...pick(remote) };

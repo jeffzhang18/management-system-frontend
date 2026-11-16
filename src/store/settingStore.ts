@@ -6,6 +6,7 @@ import { FontFamilyPreset, typographyTokens } from "@/theme/tokens/typography";
 export type SettingsType = {
 	themeColorPresets: ThemeColorPresets;
 	themeMode: ThemeMode;
+	themeFollowSystem: boolean;
 	themeLayout: ThemeLayout;
 	themeStretch: boolean;
 	breadCrumb: boolean;
@@ -30,6 +31,7 @@ const useSettingStore = create<SettingStore>()(
 			settings: {
 				themeColorPresets: ThemeColorPresets.Default,
 				themeMode: ThemeMode.Light,
+				themeFollowSystem: false,
 				themeLayout: ThemeLayout.Vertical,
 				themeStretch: false,
 				breadCrumb: true,

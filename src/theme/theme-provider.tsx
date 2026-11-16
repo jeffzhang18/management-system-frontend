@@ -1,6 +1,7 @@
 import { useSettings } from "@/store/settingStore";
 import { useEffect } from "react";
 import { HtmlDataAttribute } from "#/enum";
+import { useFollowSystemTheme } from "./hooks/use-follow-system-theme";
 import type { UILibraryAdapter } from "./type";
 interface ThemeProviderProps {
 	children: React.ReactNode;
@@ -9,6 +10,8 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children, adapters = [] }: ThemeProviderProps) {
 	const { themeMode, themeColorPresets, fontFamily, fontSize } = useSettings();
+
+	useFollowSystemTheme();
 
 	// Update HTML class to support Tailwind dark mode
 	useEffect(() => {

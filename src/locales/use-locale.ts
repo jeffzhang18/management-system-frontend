@@ -9,8 +9,10 @@ import { useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { UserInfo } from "#/entity";
 import { LocalEnum, StorageEnum } from "#/enum";
+import uiSettingsService from "@/api/services/uiSettingsService";
 import userService from "@/api/services/userService";
 import { useUserActions, useUserInfo, useUserToken } from "@/store/userStore";
+import i18nInstance from "./i18n";
 
 dayjs.extend(updateLocale);
 dayjs.updateLocale("zh-cn", { weekStart: 0 });
@@ -36,6 +38,20 @@ export const LANGUAGE_MAP: Record<Locale, Language> = {
 		icon: "flag-us",
 		antdLocal: en_US,
 	},
+};
+
+export const isLocale = (value: unknown): value is Locale => typeof value === "string" && value in LANGUAGE_MAP;
+
+export const getCurrentLocale = (): Locale => {
+	const current = i18nInstance.resolvedLanguage || i18nInstance.language;
+	return isLocale(current) ? current : LocalEnum.en_US;
+};
+
+export const applyLocaleSetting = (nextLocale: Locale) => {
+	void i18nInstance.changeLanguage(nextLocale);
+	localStorage.setItem(StorageEnum.I18N, nextLocale);
+	document.documentElement.lang = nextLocale;
+	dayjs.locale(nextLocale === LocalEnum.zh_CN ? "zh-cn" : "en");
 };
 
 export default function useLocale() {
@@ -82,6 +98,7 @@ export default function useLocale() {
 		}
 
 		applyLocale(nextLocale);
+		void uiSettingsService.save({ language: nextLocale }).catch(() => {});
 
 		const languageValue = mapLocaleToApiLanguage(nextLocale);
 		try {

@@ -2,6 +2,7 @@ import CyanBlur from "@/assets/images/background/cyan-blur.png";
 import RedBlur from "@/assets/images/background/red-blur.png";
 import { Icon } from "@/components/icon";
 import { type SettingsType, useSettingActions, useSettings } from "@/store/settingStore";
+import { getSystemThemeMode } from "@/theme/hooks/use-follow-system-theme";
 import { themeVars } from "@/theme/theme.css";
 import { presetsColors } from "@/theme/tokens/color";
 import { FontFamilyPreset } from "@/theme/tokens/typography";
@@ -23,7 +24,16 @@ import { type ThemeColorPresets, ThemeLayout, ThemeMode } from "#/enum";
 export default function SettingButton() {
 	const { t } = useTranslation();
 	const settings = useSettings();
-	const { themeMode, themeColorPresets, themeLayout, themeStretch, breadCrumb, fontSize, fontFamily } = settings;
+	const {
+		themeMode,
+		themeFollowSystem,
+		themeColorPresets,
+		themeLayout,
+		themeStretch,
+		breadCrumb,
+		fontSize,
+		fontFamily,
+	} = settings;
 	const { setSettings } = useSettingActions();
 
 	const updateSettings = (partialSettings: Partial<SettingsType>) => {
@@ -31,6 +41,17 @@ export default function SettingButton() {
 			...settings,
 			...partialSettings,
 		});
+	};
+
+	const selectThemeMode = (mode: ThemeMode) => {
+		if (themeFollowSystem) return;
+		updateSettings({ themeMode: mode });
+	};
+
+	const toggleFollowSystem = (checked: boolean) => {
+		updateSettings(
+			checked ? { themeFollowSystem: true, themeMode: getSystemThemeMode() } : { themeFollowSystem: false },
+		);
 	};
 
 	const sheetContentBgStyle: CSSProperties = {
@@ -95,8 +116,12 @@ export default function SettingButton() {
 							<Text variant="subTitle1">{t("sys.settings.mode")}</Text>
 							<div className="flex flex-row gap-4">
 								<Card
-									onClick={() => updateSettings({ themeMode: ThemeMode.Light })}
-									className="flex flex-1 h-20 cursor-pointer items-center justify-center"
+									onClick={() => selectThemeMode(ThemeMode.Light)}
+									aria-disabled={themeFollowSystem}
+									className={cn(
+										"flex flex-1 h-20 items-center justify-center",
+										themeFollowSystem ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+									)}
 								>
 									<Icon
 										icon="local:ic-settings-mode-sun"
@@ -105,8 +130,12 @@ export default function SettingButton() {
 									/>
 								</Card>
 								<Card
-									onClick={() => updateSettings({ themeMode: ThemeMode.Dark })}
-									className="flex flex-1 h-20 cursor-pointer items-center justify-center"
+									onClick={() => selectThemeMode(ThemeMode.Dark)}
+									aria-disabled={themeFollowSystem}
+									className={cn(
+										"flex flex-1 h-20 items-center justify-center",
+										themeFollowSystem ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+									)}
 								>
 									<Icon
 										icon="local:ic-settings-mode-moon"
@@ -114,6 +143,10 @@ export default function SettingButton() {
 										color={themeMode === ThemeMode.Dark ? themeVars.colors.palette.primary.default : ""}
 									/>
 								</Card>
+							</div>
+							<div className="flex items-center justify-between">
+								<Text variant="subTitle2">{t("sys.settings.followSystem")}</Text>
+								<Switch checked={Boolean(themeFollowSystem)} onCheckedChange={toggleFollowSystem} />
 							</div>
 						</div>
 

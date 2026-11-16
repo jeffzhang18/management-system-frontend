@@ -55,6 +55,47 @@
 	border-radius: 10px;
 }
 
+.search-page[data-solid="dark"] {
+	--search-fg: #f4f6f8;
+	--search-muted: #919eab;
+	--search-surface: rgb(255 255 255 / 0.06);
+	--search-border: rgb(255 255 255 / 0.12);
+	--lg-fg-faint: #637381;
+}
+.search-page[data-solidac="dark"] .search-bar {
+	--search-fg: #f4f6f8;
+	--search-muted: #919eab;
+	--search-surface: rgb(255 255 255 / 0.06);
+	--search-border: rgb(255 255 255 / 0.12);
+	--lg-fg: #f4f6f8;
+	--lg-fg-muted: #919eab;
+	--lg-fg-faint: #637381;
+	--lg-panel-fill: rgb(33 43 54 / 0.9);
+	--lg-edge: rgb(255 255 255 / 0.12);
+}
+.search-page[data-solid="dark"]
+	:is(
+		.search-toolbar > button,
+		.search-incognito,
+		.search-bookmark-icon,
+		.search-bookmark-actions button,
+		.search-status,
+		.search-sort-help,
+		.search-empty
+	) {
+	background: var(--search-surface);
+}
+.search-page[data-solid="dark"] .search-bookmark-name {
+	padding: 0;
+	background: none;
+}
+.search-page[data-solid="dark"] .search-error {
+	background: rgb(127 29 29 / 0.5);
+}
+.search-page[data-solid="dark"] :is(.search-toolbar > button, .search-bookmark-icon) {
+	box-shadow: none;
+}
+
 .search-wallpaper,
 .search-shade {
 	position: absolute;
