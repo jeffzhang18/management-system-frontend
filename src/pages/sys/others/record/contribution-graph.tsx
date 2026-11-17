@@ -1,6 +1,6 @@
 import { Card, Spin, Typography } from "antd";
 import dayjs from "dayjs";
-import { memo, useMemo, useRef } from "react";
+import { memo, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import styled from "styled-components";
@@ -34,15 +34,18 @@ const levelFromCount = (count: number) => {
 	return 0;
 };
 const intensityColor = (level: number) => {
-	if (level === 0) return `color-mix(in srgb, ${themeVars.colors.text.primary} 8%, ${themeVars.colors.background.paper})`;
+	if (level === 0)
+		return `color-mix(in srgb, ${themeVars.colors.text.primary} 8%, ${themeVars.colors.background.paper})`;
 	const strength = [0, 24, 45, 68, 100][level];
 	return `color-mix(in srgb, ${themeVars.colors.palette.primary.default} ${strength}%, ${themeVars.colors.background.paper})`;
 };
+const contributionCell = (target: EventTarget | null) =>
+	target instanceof HTMLElement ? target.closest<HTMLElement>("[data-contribution-date]") : null;
 
 function ContributionGraphComponent({ items, loading, year, years, onYearChange, onDateSelect }: Props) {
 	const { t, i18n } = useTranslation();
 	const tooltipRef = useRef<HTMLDivElement>(null);
-	const showTooltip = (target: HTMLElement, text: string) => {
+	const showTooltip = useCallback((target: HTMLElement, text: string) => {
 		const tooltip = tooltipRef.current;
 		if (!tooltip) return;
 		const rect = target.getBoundingClientRect();
@@ -50,10 +53,10 @@ function ContributionGraphComponent({ items, loading, year, years, onYearChange,
 		tooltip.style.left = `${rect.left + rect.width / 2}px`;
 		tooltip.style.top = `${rect.top - 6}px`;
 		tooltip.style.opacity = "1";
-	};
-	const hideTooltip = () => {
+	}, []);
+	const hideTooltip = useCallback(() => {
 		if (tooltipRef.current) tooltipRef.current.style.opacity = "0";
-	};
+	}, []);
 	const { weeks, monthLabels, weekCount, total } = useMemo(() => {
 		const valueByDate = new Map(items.map((item) => [dayjs(item.date).format("YYYY-MM-DD"), item]));
 		const yearStart = dayjs(`${year}-01-01`);
@@ -93,98 +96,120 @@ function ContributionGraphComponent({ items, loading, year, years, onYearChange,
 			total: items.reduce((sum, item) => sum + Number(item.records ?? 0), 0),
 		};
 	}, [i18n.resolvedLanguage, items, year]);
+	const chart = useMemo(() => {
+		const showCellTooltip = (target: EventTarget) => {
+			const cell = contributionCell(target);
+			const text = cell?.getAttribute("aria-label");
+			if (cell && text) showTooltip(cell, text);
+		};
 		const getLegendTooltip = (level: number) => {
-		if (level === 4) return t("sys.record.contributions.legendLevel4");
-		if (level === 3) return t("sys.record.contributions.legendLevel3");
-		if (level === 2) return t("sys.record.contributions.legendLevel2");
-		if (level === 1) return t("sys.record.contributions.legendLevel1");
-		return t("sys.record.contributions.legendLevel0");
-	};
+			if (level === 4) return t("sys.record.contributions.legendLevel4");
+			if (level === 3) return t("sys.record.contributions.legendLevel3");
+			if (level === 2) return t("sys.record.contributions.legendLevel2");
+			if (level === 1) return t("sys.record.contributions.legendLevel1");
+			return t("sys.record.contributions.legendLevel0");
+		};
+		return (
+			<ScrollArea onScroll={hideTooltip}>
+				<Chart $weekCount={weekCount} aria-label={t("sys.record.contributions.yearLabel", { year })}>
+					<Months>
+						{monthLabels.map(({ label, column }) => (
+							<Month key={`${label}-${column}`} style={{ left: column * (CELL_SIZE + CELL_GAP) }}>
+								{label}
+							</Month>
+						))}
+					</Months>
+					<Weekdays aria-hidden="true">
+						<span>{t("sys.record.contributions.monday")}</span>
+						<span>{t("sys.record.contributions.wednesday")}</span>
+						<span>{t("sys.record.contributions.friday")}</span>
+					</Weekdays>
+					<Grid
+						onClick={(event) => {
+							const date = contributionCell(event.target)?.dataset.contributionDate;
+							if (date) onDateSelect(date);
+						}}
+						onMouseOver={(event) => showCellTooltip(event.target)}
+						onMouseOut={hideTooltip}
+						onFocus={(event) => showCellTooltip(event.target)}
+						onBlur={hideTooltip}
+						onKeyDown={(event) => {
+							const date = contributionCell(event.target)?.dataset.contributionDate;
+							if (date && (event.key === "Enter" || event.key === " ")) {
+								event.preventDefault();
+								onDateSelect(date);
+							}
+						}}
+					>
+						{weeks.map((week) => (
+							<div className="record-contribution-week" key={week[0].key}>
+								{week.map((day) => {
+									const tooltip = day.inYear
+										? t("sys.record.contributions.tooltip", { date: day.key, count: day.count })
+										: undefined;
+									return (
+										<button
+											type="button"
+											key={day.key}
+											className="record-contribution-cell"
+											data-level={day.level}
+											data-hidden={!day.inYear || undefined}
+											data-contribution-date={day.inYear ? day.key : undefined}
+											aria-label={tooltip}
+											disabled={!day.inYear}
+											tabIndex={day.inYear ? 0 : -1}
+										/>
+									);
+								})}
+							</div>
+						))}
+					</Grid>
+				</Chart>
+				<Legend $weekCount={weekCount}>
+					<span>{t("sys.record.contributions.less")}</span>
+					{[0, 1, 2, 3, 4].map((level) => {
+						const legendTooltip = getLegendTooltip(level);
+						return (
+							<LegendCell
+								key={level}
+								$level={level}
+								$hidden={false}
+								$interactive
+								aria-label={legendTooltip}
+								onMouseEnter={(event) => showTooltip(event.currentTarget, legendTooltip)}
+								onFocus={(event) => showTooltip(event.currentTarget, legendTooltip)}
+								onMouseLeave={hideTooltip}
+								onBlur={hideTooltip}
+							/>
+						);
+					})}
+					<span>{t("sys.record.contributions.more")}</span>
+				</Legend>
+			</ScrollArea>
+		);
+	}, [weeks, monthLabels, weekCount, year, t, onDateSelect, showTooltip, hideTooltip]);
+
 	return (
 		<ContributionCard>
 			<Header>
 				<div>
 					<Typography.Title level={5}>{t("sys.record.contributions.title")}</Typography.Title>
-					<Typography.Text type="secondary">{t("sys.record.contributions.summary", { year, count: total })}</Typography.Text>
+					<Typography.Text type="secondary">
+						{t("sys.record.contributions.summary", { year, count: total })}
+					</Typography.Text>
 				</div>
 			</Header>
 			<Content>
-				<Spin spinning={loading}>
-					<ScrollArea>
-						<Chart $weekCount={weekCount} aria-label={t("sys.record.contributions.yearLabel", { year })}>
-							<Months>
-								{monthLabels.map(({ label, column }) => (
-									<Month key={`${label}-${column}`} style={{ left: column * (CELL_SIZE + CELL_GAP) }}>{label}</Month>
-								))}
-							</Months>
-							<Weekdays aria-hidden="true">
-								<span>{t("sys.record.contributions.monday")}</span>
-								<span>{t("sys.record.contributions.wednesday")}</span>
-								<span>{t("sys.record.contributions.friday")}</span>
-							</Weekdays>
-							<Grid>
-								{weeks.map((week) => (
-									<Week key={week[0].key}>
-										{week.map((day) => {
-											const tooltip = day.inYear ? t("sys.record.contributions.tooltip", { date: day.key, count: day.count }) : undefined;
-											return (
-												<Cell
-													key={day.key}
-													$level={day.level}
-													$hidden={!day.inYear}
-													$interactive={day.inYear}
-													aria-label={tooltip}
-													role={day.inYear ? "button" : undefined}
-													tabIndex={day.inYear ? 0 : -1}
-													onClick={() => {
-														if (day.inYear) onDateSelect(day.key);
-													}}
-													onMouseEnter={(event) => {
-														if (tooltip) showTooltip(event.currentTarget, tooltip);
-													}}
-													onMouseLeave={hideTooltip}
-													onFocus={(event) => {
-														if (tooltip) showTooltip(event.currentTarget, tooltip);
-													}}
-													onBlur={hideTooltip}
-													onKeyDown={(event) => {
-														if (day.inYear && (event.key === "Enter" || event.key === " ")) {
-															event.preventDefault();
-															onDateSelect(day.key);
-														}
-													}}
-												/>
-											);
-										})}
-									</Week>
-								))}
-							</Grid>
-						</Chart>
-						<Legend $weekCount={weekCount}>
-							<span>{t("sys.record.contributions.less")}</span>
-							{[0, 1, 2, 3, 4].map((level) => {
-								const legendTooltip = getLegendTooltip(level);
-								return (
-									<LegendCell
-										key={level}
-										$level={level}
-										$hidden={false}
-										$interactive
-										aria-label={legendTooltip}
-										onMouseEnter={(event) => showTooltip(event.currentTarget, legendTooltip)}
-										onFocus={(event) => showTooltip(event.currentTarget, legendTooltip)}
-										onMouseLeave={hideTooltip}
-										onBlur={hideTooltip}
-									/>
-								);
-							})}
-							<span>{t("sys.record.contributions.more")}</span>
-						</Legend>
-					</ScrollArea>
-				</Spin>
+				<Spin spinning={loading}>{chart}</Spin>
 				<YearList aria-label={t("sys.record.contributions.selectYear")}>
 					{years.map((option) => (
-						<YearButton key={option} type="button" $active={option === year} onClick={() => onYearChange(option)} aria-pressed={option === year}>
+						<YearButton
+							key={option}
+							type="button"
+							$active={option === year}
+							onClick={() => onYearChange(option)}
+							aria-pressed={option === year}
+						>
 							{option}
 						</YearButton>
 					))}
@@ -215,15 +240,38 @@ const ScrollArea = styled.div`
 	width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 0 0 4px; overscroll-behavior-inline: contain; scrollbar-width: thin; -webkit-overflow-scrolling: touch;
 	@media (max-width: 767px) { padding-right: 4px; padding-bottom: 8px; }
 `;
-const Chart = styled.div<{ $weekCount: number }>`position: relative; width: ${({ $weekCount }) => $weekCount * (CELL_SIZE + CELL_GAP) - CELL_GAP}px; margin-left: 32px; padding-top: 32px;`;
+const Chart = styled.div<{
+	$weekCount: number;
+}>`position: relative; width: ${({ $weekCount }) => $weekCount * (CELL_SIZE + CELL_GAP) - CELL_GAP}px; margin-left: 32px; padding-top: 32px;`;
 const Months = styled.div`position: absolute; top: 0; left: 0; width: 100%; height: 18px; color: ${themeVars.colors.text.secondary}; font-size: 11px;`;
 const Month = styled.span`position: absolute; white-space: nowrap;`;
 const Weekdays = styled.div`
 	position: absolute; top: 32px; left: -32px; display: grid; height: ${7 * (CELL_SIZE + CELL_GAP) - CELL_GAP}px; grid-template-rows: repeat(7, ${CELL_SIZE}px); gap: ${CELL_GAP}px; color: ${themeVars.colors.text.secondary}; font-size: 10px;
 	span:nth-child(1) { grid-row: 2; } span:nth-child(2) { grid-row: 4; } span:nth-child(3) { grid-row: 6; }
 `;
-const Grid = styled.div`display: flex; gap: ${CELL_GAP}px;`;
-const Week = styled.div`display: flex; flex-direction: column; gap: ${CELL_GAP}px;`;
+const Grid = styled.div`
+	display: flex;
+	gap: ${CELL_GAP}px;
+	.record-contribution-week { display: flex; flex-direction: column; gap: ${CELL_GAP}px; }
+	.record-contribution-cell {
+		position: relative;
+		display: block;
+		width: ${CELL_SIZE}px;
+		height: ${CELL_SIZE}px;
+		flex: none;
+		padding: 0;
+		border: 1px solid color-mix(in srgb, ${themeVars.colors.text.primary} 8%, transparent);
+		border-radius: 2px;
+		background: ${intensityColor(0)};
+		cursor: pointer;
+	}
+	[data-level="1"] { background: ${intensityColor(1)}; }
+	[data-level="2"] { background: ${intensityColor(2)}; }
+	[data-level="3"] { background: ${intensityColor(3)}; }
+	[data-level="4"] { background: ${intensityColor(4)}; }
+	[data-hidden] { visibility: hidden; }
+	.record-contribution-cell:focus-visible { outline: 2px solid ${themeVars.colors.palette.primary.default}; outline-offset: 2px; }
+`;
 const Cell = styled.span<{ $level: number; $hidden: boolean; $interactive?: boolean }>`
 	position: relative; display: block; width: ${CELL_SIZE}px; height: ${CELL_SIZE}px; flex: none; border: 1px solid color-mix(in srgb, ${themeVars.colors.text.primary} 8%, transparent); border-radius: 2px;
 	background: ${({ $level }) => intensityColor($level)};
@@ -248,7 +296,9 @@ const ContributionTooltip = styled.div`
 	transform: translate(-50%, -100%);
 	transition: opacity 100ms ease;
 `;
-const Legend = styled.div<{ $weekCount: number }>`display: flex; width: ${({ $weekCount }) => $weekCount * (CELL_SIZE + CELL_GAP) - CELL_GAP + 32}px; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 12px; color: ${themeVars.colors.text.secondary}; font-size: 11px;`;
+const Legend = styled.div<{
+	$weekCount: number;
+}>`display: flex; width: ${({ $weekCount }) => $weekCount * (CELL_SIZE + CELL_GAP) - CELL_GAP + 32}px; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 12px; color: ${themeVars.colors.text.secondary}; font-size: 11px;`;
 const YearList = styled.div`
 	display: flex; flex-direction: column; gap: 4px;
 	@media (max-width: 767px) { width: 100%; min-width: 0; flex-direction: row; gap: 6px; overflow-x: auto; padding: 0 4px 2px; overscroll-behavior-inline: contain; scrollbar-width: none; &::-webkit-scrollbar { display: none; } }

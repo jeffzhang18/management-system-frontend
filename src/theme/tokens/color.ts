@@ -1,5 +1,5 @@
-import { rgbAlpha } from "@/utils/theme";
 import { ThemeColorPresets } from "#/enum";
+import { rgbAlpha } from "@/utils/theme";
 
 export const presetsColors = {
 	[ThemeColorPresets.Default]: {
@@ -136,8 +136,8 @@ export const darkColorTokens = {
 		disabled: paletteColors.gray[600],
 	},
 	background: {
-		default: commonColors.black,
-		paper: commonColors.black,
-		neutral: "#27272A",
+		default: "#181A1F",
+		paper: "#202329",
+		neutral: "#292D35",
 	},
 };

@@ -10,9 +10,8 @@ import {
 import { rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
 import type { Bookmark, SearchSettings } from "@/api/services/searchService";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { bookmarkGrid, safeIcon, validUrl } from "./logic";
 import { OnlineImage, useLabels } from "./shared";
@@ -152,14 +151,25 @@ export function Bookmarks({
 }) {
 	const l = useLabels();
 	const container = useRef<HTMLDivElement>(null);
-	const [width, setWidth] = useState(0);
-	const mobile = useMediaQuery({ maxWidth: 767 });
-	useEffect(() => {
+	const [{ width, mobile }, setLayout] = useState({ width: 0, mobile: false });
+	useLayoutEffect(() => {
 		const element = container.current;
 		if (!element) return;
-		const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+		const media = window.matchMedia("(max-width: 767px)");
+		const updateLayout = (width: number) =>
+			setLayout((current) =>
+				current.width === width && current.mobile === media.matches ? current : { width, mobile: media.matches },
+			);
+		const measure = () => updateLayout(element.getBoundingClientRect().width);
+		// Resolve width and breakpoint before the first paint, rather than waiting for the observer.
+		measure();
+		const observer = new ResizeObserver(([entry]) => updateLayout(entry.contentRect.width));
 		observer.observe(element);
-		return () => observer.disconnect();
+		media.addEventListener("change", measure);
+		return () => {
+			observer.disconnect();
+			media.removeEventListener("change", measure);
+		};
 	}, []);
 	const grid = bookmarkGrid(Math.max(0, width - 8), items.length + 1, settings, mobile, editing);
 	const sensors = useSensors(

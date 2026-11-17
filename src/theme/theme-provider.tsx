@@ -1,8 +1,9 @@
-import { useSettings } from "@/store/settingStore";
 import { useEffect } from "react";
 import { HtmlDataAttribute } from "#/enum";
+import { useSettings } from "@/store/settingStore";
 import { useFollowSystemTheme } from "./hooks/use-follow-system-theme";
 import type { UILibraryAdapter } from "./type";
+
 interface ThemeProviderProps {
 	children: React.ReactNode;
 	adapters?: UILibraryAdapter[];
@@ -17,6 +18,8 @@ export function ThemeProvider({ children, adapters = [] }: ThemeProviderProps) {
 	useEffect(() => {
 		const root = window.document.documentElement;
 		root.setAttribute(HtmlDataAttribute.ThemeMode, themeMode);
+		// Liquid Glass uses data-theme, while the app uses data-theme-mode.
+		root.setAttribute("data-theme", themeMode);
 	}, [themeMode]);
 
 	// Dynamically update theme color related CSS variables

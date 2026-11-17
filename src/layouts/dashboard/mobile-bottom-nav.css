@@ -9,10 +9,10 @@
 		padding-bottom: 0;
 	}
 	.dashboard-mobile-nav {
-		--lg-fg: #172033;
-		--lg-fg-muted: #667085;
-		--lg-fill: rgb(248 252 250 / 0.76);
-		--lg-tab-selection: rgb(15 23 42 / 0.08);
+		--lg-fg: var(--foreground);
+		--lg-fg-muted: var(--muted-foreground);
+		--lg-fill: color-mix(in srgb, var(--card) 92%, transparent);
+		--lg-tab-selection: color-mix(in srgb, var(--foreground) 8%, transparent);
 		--lg-accent: var(--primary);
 		--lg-ring: color-mix(in srgb, var(--primary) 45%, transparent);
 		position: fixed;
@@ -35,8 +35,7 @@
 	.dashboard-mobile-nav .lg-track__glass {
 		box-shadow:
 			0 8px 32px rgb(15 23 42 / 0.14),
-			inset 0 0 0 1px rgb(255 255 255 / 0.7),
-			inset 0 1px 1px rgb(255 255 255 / 0.9);
+			inset 0 0 0 1px var(--border);
 	}
 	.dashboard-mobile-nav .lg-track__item:focus-visible {
 		outline: 2px solid var(--lg-ring);

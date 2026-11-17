@@ -125,9 +125,7 @@ function SearchContent({ userId }: { userId?: string }) {
 						? `linear-gradient(${gradient.gradientAngle}deg, ${gradient.gradientFrom}, ${gradient.gradientTo})`
 						: effective.backgroundMode === "online"
 							? "#172033"
-							: solidDark
-								? "#161c24"
-								: "#fff",
+							: "var(--background)",
 			}}
 		>
 			<Helmet>
@@ -141,27 +139,6 @@ function SearchContent({ userId }: { userId?: string }) {
 			)}
 			<div className="search-content">
 				<div className="search-toolbar">
-					<label className="search-incognito" htmlFor="search-incognito-toggle" title={l("incognitoHelp")}>
-						<span>{l("incognito")}</span>
-						<GlassSwitch
-							id="search-incognito-toggle"
-							intensity={1}
-							tint="var(--primary)"
-							aria-label={l("incognito")}
-							aria-describedby="search-incognito-help"
-							checked={incognito}
-							disabled={pending}
-							onChange={(value) => {
-								setIncognito(value);
-								setFallback("");
-								setSearchFailed(false);
-								setError("");
-							}}
-						/>
-					</label>
-					<span id="search-incognito-help" className="sr-only">
-						{l("incognitoHelp")}
-					</span>
 					<button type="button" title={l("history")} aria-label={l("history")} onClick={() => setHistory(true)}>
 						<Clock3 size={20} />
 					</button>
@@ -284,7 +261,7 @@ function SearchContent({ userId }: { userId?: string }) {
 						</button>
 					</div>
 				)}
-				{bookmarks.isPending ? (
+				{settings.isPending || bookmarks.isPending ? (
 					<output className="search-empty">{l("loading")}</output>
 				) : (
 					<Bookmarks
@@ -316,6 +293,27 @@ function SearchContent({ userId }: { userId?: string }) {
 					</div>
 				)}
 			</div>
+			<label className="search-incognito" htmlFor="search-incognito-toggle" title={l("incognitoHelp")}>
+				<span>{l("incognito")}</span>
+				<GlassSwitch
+					id="search-incognito-toggle"
+					intensity={1}
+					tint="var(--primary)"
+					aria-label={l("incognito")}
+					aria-describedby="search-incognito-help"
+					checked={incognito}
+					disabled={pending}
+					onChange={(value) => {
+						setIncognito(value);
+						setFallback("");
+						setSearchFailed(false);
+						setError("");
+					}}
+				/>
+			</label>
+			<span id="search-incognito-help" className="sr-only">
+				{l("incognitoHelp")}
+			</span>
 			{draft && settings.data && (
 				<Settings
 					saved={settings.data}

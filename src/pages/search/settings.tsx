@@ -1,4 +1,5 @@
 import { GlassInput, GlassSwitch } from "@zakisheriff/liquid-glass";
+import { LayoutGrid, Search, Wallpaper } from "lucide-react";
 import { useState } from "react";
 import searchService, { type SearchSettings } from "@/api/services/searchService";
 import { GlassAction, GlassPanel } from "../subscriptions/glass";
@@ -50,9 +51,11 @@ export function Settings({
 	return (
 		<SearchSheet
 			title={l("settings")}
+			description={l("settingsDescription")}
 			close={() => !busy && close()}
 			footer={
 				<>
+					<p className="search-footer-note">{l("previewHint")}</p>
 					<button type="button" disabled={busy} onClick={close}>
 						{l("cancel")}
 					</button>
@@ -64,14 +67,18 @@ export function Settings({
 		>
 			<fieldset className="search-form" disabled={busy}>
 				<GlassPanel className="search-fields search-section" radius="20px">
-					<h3>{l("searchBehavior")}</h3>
+					<h3>
+						<Search size={17} aria-hidden="true" />
+						{l("searchBehavior")}
+					</h3>
 					<div className="search-field">
 						<span>{l("defaultEngine")}</span>
 						<EngineSelect value={draft.defaultEngine} onChange={(defaultEngine) => patch({ defaultEngine })} />
 					</div>
-					<label className="search-check">
+					<label className="search-check" htmlFor="search-new-tab">
 						<span>{l("newTab")}</span>
 						<GlassSwitch
+							id="search-new-tab"
 							intensity={1}
 							tint="var(--primary)"
 							aria-label={l("newTab")}
@@ -81,7 +88,10 @@ export function Settings({
 					</label>
 				</GlassPanel>
 				<GlassPanel className="search-fields search-section" radius="20px">
-					<h3>{l("wallpaper")}</h3>
+					<h3>
+						<Wallpaper size={17} aria-hidden="true" />
+						{l("wallpaper")}
+					</h3>
 					<SearchSelect
 						label={l("wallpaper")}
 						value={draft.backgroundMode}
@@ -92,6 +102,7 @@ export function Settings({
 							{ value: "online", label: l("online") },
 						]}
 					/>
+					{draft.backgroundMode === "default" && <p className="search-help">{l("solidBackgroundHelp")}</p>}
 					{draft.backgroundMode === "gradient" && (
 						<>
 							<div className="search-colors">
@@ -133,7 +144,9 @@ export function Settings({
 								]}
 							/>
 							<label>
-								{l("gradientAngle")} <output>{draft.gradientAngle}°</output>
+								<span className="search-range-label">
+									{l("gradientAngle")} <output>{draft.gradientAngle}°</output>
+								</span>
 								<SearchSlider
 									intensity={1}
 									min={0}
@@ -146,6 +159,7 @@ export function Settings({
 							</label>
 							<div
 								className="search-gradient-preview"
+								role="img"
 								aria-label={l("backgroundPreview")}
 								style={{
 									background: validGradient(draft)
@@ -181,7 +195,7 @@ export function Settings({
 										return;
 									}
 									setError("");
-									setPreview(draft.wallpaperUrl!);
+									setPreview(draft.wallpaperUrl || "");
 								}}
 							>
 								{l("preview")}
@@ -202,7 +216,9 @@ export function Settings({
 								{l("removeImage")}
 							</button>
 							<label>
-								{l("overlayOpacity")} <output>{draft.overlayOpacity}</output>
+								<span className="search-range-label">
+									{l("overlayOpacity")} <output>{Math.round(draft.overlayOpacity * 100)}%</output>
+								</span>
 								<SearchSlider
 									intensity={1}
 									min={0}
@@ -217,7 +233,10 @@ export function Settings({
 					)}
 				</GlassPanel>
 				<GlassPanel className="search-fields search-section" radius="20px">
-					<h3>{l("bookmarkLayout")}</h3>
+					<h3>
+						<LayoutGrid size={17} aria-hidden="true" />
+						{l("bookmarkLayout")}
+					</h3>
 					{(
 						[
 							["iconSize", 40, 112],
@@ -227,7 +246,13 @@ export function Settings({
 						] as const
 					).map(([key, min, max]) => (
 						<label key={key}>
-							{l(key)} <output>{draft[key]}</output>
+							<span className="search-range-label">
+								{l(key)}{" "}
+								<output>
+									{draft[key]}
+									{key !== "itemsPerLine" && <span className="search-range-unit">px</span>}
+								</output>
+							</span>
 							<SearchSlider
 								intensity={1}
 								min={min}

@@ -1,5 +1,5 @@
 import { GlassSlider } from "@zakisheriff/liquid-glass";
-import { type ComponentProps, useEffect, useState } from "react";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import baiduIcon from "@/assets/search-engines/baidu.svg";
 import bingIcon from "@/assets/search-engines/bing.svg";
@@ -43,16 +43,19 @@ export function SearchSlider(props: ComponentProps<typeof GlassSlider>) {
 }
 export function SearchSheet({
 	title,
+	description,
 	children,
 	close,
 	footer,
 }: {
 	title: string;
+	description?: string;
 	children: React.ReactNode;
 	close: () => void;
 	footer?: React.ReactNode;
 }) {
 	const mobile = useMediaQuery({ maxWidth: 767 });
+	const titleRef = useRef<HTMLHeadingElement>(null);
 	const [viewport, setViewport] = useState<{ height: number; bottom: number }>();
 	useEffect(() => {
 		const visual = window.visualViewport;
@@ -75,6 +78,11 @@ export function SearchSheet({
 			<SheetContent
 				side={mobile ? "bottom" : "right"}
 				className="search-sheet"
+				overlayClassName="search-sheet-overlay"
+				onOpenAutoFocus={(event) => {
+					event.preventDefault();
+					titleRef.current?.focus();
+				}}
 				aria-describedby={undefined}
 				style={
 					mobile && viewport
@@ -84,8 +92,12 @@ export function SearchSheet({
 			>
 				<GlassPanel className="search-sheet-material" padding="0" radius="28px">
 					<SheetHeader className="search-sheet-header">
-						<SheetTitle>{title}</SheetTitle>
-						<SheetDescription className="sr-only">{title}</SheetDescription>
+						<SheetTitle ref={titleRef} tabIndex={-1} className="outline-none">
+							{title}
+						</SheetTitle>
+						<SheetDescription className={description ? "search-sheet-description" : "sr-only"}>
+							{description || title}
+						</SheetDescription>
 					</SheetHeader>
 					<div className="search-sheet-body">{children}</div>
 					{footer && <div className="search-footer">{footer}</div>}

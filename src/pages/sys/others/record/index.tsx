@@ -12,6 +12,7 @@ import { Icon } from "@/components/icon";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { themeVars } from "@/theme/theme.css";
 import { Button } from "@/ui/button";
+import { AiReportModal } from "./ai-report-modal";
 import {
 	type CalendarCellRecord,
 	mapCalendarSummaryItem,
@@ -20,13 +21,18 @@ import {
 	parseImportRecordsPayload,
 	resolveThemeIdByThemeValue,
 } from "./api-adapter";
-import { ExportModal } from "./export-modal";
-import { AiReportModal } from "./ai-report-modal";
 import { ContributionGraph } from "./contribution-graph";
-import { exportRecords, type ExportFormat } from "./export-records";
+import { ExportModal } from "./export-modal";
+import { type ExportFormat, exportRecords } from "./export-records";
 import { type CreateRecordFormPayload, RecordFormModal } from "./record-form-modal";
 import { RecordList } from "./record-list";
-import { compareWorkRecords, getRecordTheme, getRecordThemeLabel, type RecordThemeOption, type WorkRecord } from "./types";
+import {
+	compareWorkRecords,
+	getRecordTheme,
+	getRecordThemeLabel,
+	type RecordThemeOption,
+	type WorkRecord,
+} from "./types";
 
 const dateKey = (date: Dayjs) => date.format("YYYY-MM-DD");
 const SELECTED_DATE_STORAGE_KEY = "work-record.selectedDate";
@@ -78,8 +84,11 @@ export default function RecordPage() {
 	const calendarRequestIdRef = useRef(0);
 	const calendarCardRef = useRef<HTMLDivElement>(null);
 	const createOpenRef = useRef(false);
-	const hoverLoadingDatesRef = useRef(new Set<string>());
-	const [selectedDate, setSelectedDate] = useState(() => resolveSelectedDateFromLocationState(location.state) ?? resolveStoredSelectedDate() ?? dayjs());
+	const hoverRecordsByDateRef = useRef<Record<string, WorkRecord[]>>({});
+	const dayRequestsRef = useRef(new Map<string, Promise<WorkRecord[]>>());
+	const [selectedDate, setSelectedDate] = useState(
+		() => resolveSelectedDateFromLocationState(location.state) ?? resolveStoredSelectedDate() ?? dayjs(),
+	);
 	const [calendarRecords, setCalendarRecords] = useState<CalendarCellRecord[]>([]);
 	const [dayRecords, setDayRecords] = useState<WorkRecord[]>([]);
 	const [hoverRecordsByDate, setHoverRecordsByDate] = useState<Record<string, WorkRecord[]>>({});
@@ -124,17 +133,30 @@ export default function RecordPage() {
 		return result;
 	}, [calendarRecords]);
 
-	const loadHoverRecords = useCallback(async (date: string) => {
-		if (hoverRecordsByDate[date] || hoverLoadingDatesRef.current.has(date)) return;
-		hoverLoadingDatesRef.current.add(date);
-		try {
-			const records = await workRecordService.getRecordsByDate(date);
-			const normalized = records.map(mapWorkRecordDetail).sort(compareWorkRecords);
-			setHoverRecordsByDate((previous) => ({ ...previous, [date]: normalized }));
-		} finally {
-			hoverLoadingDatesRef.current.delete(date);
-		}
-	}, [hoverRecordsByDate]);
+	const loadRecordsForDate = useCallback((date: string) => {
+		const existing = dayRequestsRef.current.get(date);
+		if (existing) return existing;
+
+		const request = workRecordService
+			.getRecordsByDate(date)
+			.then((records) => {
+				const normalized = records.map(mapWorkRecordDetail).sort(compareWorkRecords);
+				hoverRecordsByDateRef.current[date] = normalized;
+				setHoverRecordsByDate((previous) => ({ ...previous, [date]: normalized }));
+				return normalized;
+			})
+			.finally(() => dayRequestsRef.current.delete(date));
+		dayRequestsRef.current.set(date, request);
+		return request;
+	}, []);
+
+	const loadHoverRecords = useCallback(
+		async (date: string) => {
+			if (hoverRecordsByDateRef.current[date]) return;
+			await loadRecordsForDate(date);
+		},
+		[loadRecordsForDate],
+	);
 
 	const loadThemeList = useCallback(async () => {
 		const themeList = await workRecordService.getThemes();
@@ -156,17 +178,17 @@ export default function RecordPage() {
 		}
 	}, []);
 
-	const loadDayRecords = useCallback(async (date: string) => {
-		setDayLoading(true);
-		try {
-			const records = await workRecordService.getRecordsByDate(date);
-			const normalized = records.map(mapWorkRecordDetail).sort(compareWorkRecords);
-			setDayRecords(normalized);
-			setHoverRecordsByDate((previous) => ({ ...previous, [date]: normalized }));
-		} finally {
-			setDayLoading(false);
-		}
-	}, []);
+	const loadDayRecords = useCallback(
+		async (date: string) => {
+			setDayLoading(true);
+			try {
+				setDayRecords(await loadRecordsForDate(date));
+			} finally {
+				setDayLoading(false);
+			}
+		},
+		[loadRecordsForDate],
+	);
 
 	const loadExportCount = useCallback(async (range: [Dayjs, Dayjs]) => {
 		const startDate = range[0].format("YYYY-MM-DD");
@@ -239,7 +261,10 @@ export default function RecordPage() {
 		const updateDotCapacity = () => {
 			const cell = calendarCard.querySelector<HTMLElement>(".ant-picker-cell-in-view [data-record-date-cell='true']");
 			if (!cell) {
-				setDotCapacity(isMobile ? { full: 2, withEllipsis: 1 } : { full: 3, withEllipsis: 2 });
+				const next = isMobile ? { full: 2, withEllipsis: 1 } : { full: 3, withEllipsis: 2 };
+				setDotCapacity((previous) =>
+					previous.full === next.full && previous.withEllipsis === next.withEllipsis ? previous : next,
+				);
 				return;
 			}
 
@@ -252,18 +277,21 @@ export default function RecordPage() {
 			const ellipsisWidth = Number.parseFloat(styles.getPropertyValue("--record-ellipsis-width")) || 11;
 			const full = Math.max(0, Math.floor((width + gap) / (dotSize + gap)));
 			const withEllipsis = Math.max(0, Math.floor((width - ellipsisWidth) / (dotSize + gap)));
-			setDotCapacity({ full, withEllipsis });
+			setDotCapacity((previous) =>
+				previous.full === full && previous.withEllipsis === withEllipsis ? previous : { full, withEllipsis },
+			);
 		};
 
-		requestAnimationFrame(updateDotCapacity);
+		const frame = requestAnimationFrame(updateDotCapacity);
 		const resizeObserver = new ResizeObserver(updateDotCapacity);
 		resizeObserver.observe(calendarCard);
 		window.addEventListener("resize", updateDotCapacity);
 		return () => {
+			cancelAnimationFrame(frame);
 			resizeObserver.disconnect();
 			window.removeEventListener("resize", updateDotCapacity);
 		};
-	}, [isMobile, selectedDate, calendarRecords.length]);
+	}, [isMobile]);
 
 	const reloadData = useCallback(async () => {
 		await Promise.all([
@@ -273,7 +301,17 @@ export default function RecordPage() {
 			loadExportCount(exportRange),
 			loadContributions(),
 		]);
-	}, [exportRange, loadCalendarSummary, loadContributions, loadDayRecords, loadExportCount, loadThemeList, monthEnd, monthStart, selectedDateKey]);
+	}, [
+		exportRange,
+		loadCalendarSummary,
+		loadContributions,
+		loadDayRecords,
+		loadExportCount,
+		loadThemeList,
+		monthEnd,
+		monthStart,
+		selectedDateKey,
+	]);
 
 	const selectDate = useCallback((date: Dayjs) => {
 		const key = dateKey(date);
@@ -282,34 +320,35 @@ export default function RecordPage() {
 		replaceCurrentRouteSelectedDate(key);
 	}, []);
 
-	const updateOpenPopoverDate = (date: string | null) => {
-		setOpenPopoverDate(date);
-	};
+	const openDatePopover = useCallback(
+		(key: string) => {
+			if (createOpenRef.current) return;
+			selectDate(dayjs(key));
+			setOpenPopoverDate(key);
+			requestAnimationFrame(() => {
+				void loadHoverRecords(key);
+			});
+		},
+		[loadHoverRecords, selectDate],
+	);
 
-	const openDatePopover = useCallback((key: string) => {
-		if (createOpenRef.current) return;
-		selectDate(dayjs(key));
-		setOpenPopoverDate(key);
-		requestAnimationFrame(() => {
-			void loadHoverRecords(key);
-		});
-	}, [loadHoverRecords, selectDate]);
+	const openCreateModalForDate = useCallback(
+		(date: Dayjs) => {
+			selectDate(date);
+			createOpenRef.current = true;
+			setOpenPopoverDate(null);
+			setCreateOpen(true);
+		},
+		[selectDate],
+	);
 
-	const closePopoverImmediately = () => {
-		updateOpenPopoverDate(null);
-	};
-
-	const openCreateModalForDate = (date: Dayjs) => {
-		selectDate(date);
-		createOpenRef.current = true;
-		closePopoverImmediately();
-		setCreateOpen(true);
-	};
-
-	const goDayDetail = (date: string) => {
-		updateOpenPopoverDate(null);
-		navigate(`/record/day/${date}`, { state: { selectedDate: selectedDateKey } });
-	};
+	const goDayDetail = useCallback(
+		(date: string) => {
+			setOpenPopoverDate(null);
+			navigate(`/record/day/${date}`, { state: { selectedDate: selectedDateKey } });
+		},
+		[navigate, selectedDateKey],
+	);
 
 	const handleCreate = async (value: CreateRecordFormPayload) => {
 		const selectedTheme = value.theme;
@@ -456,7 +495,10 @@ export default function RecordPage() {
 				),
 			];
 			const details = await Promise.all(dates.map((date) => workRecordService.getRecordsByDate(date)));
-			const records = details.flat().map(mapWorkRecordDetail).sort((a, b) => a.date.localeCompare(b.date) || compareWorkRecords(a, b));
+			const records = details
+				.flat()
+				.map(mapWorkRecordDetail)
+				.sort((a, b) => a.date.localeCompare(b.date) || compareWorkRecords(a, b));
 			const exported = exportRecords(records, themes, range, exportFormat, pdfWindow);
 			if (!exported) throw new Error(t("sys.record.export.popupBlocked"));
 
@@ -473,6 +515,213 @@ export default function RecordPage() {
 			message.error(errorMessage);
 		}
 	};
+
+	// Keep the date panel out of updates to contributions, exports, and the day sidebar.
+	const calendar = useMemo(
+		() => (
+			<Calendar
+				value={selectedDate}
+				onSelect={selectDate}
+				headerRender={({ value, onChange }) => (
+					<CalendarHeader>
+						<Space size={2}>
+							<Tooltip title={t("sys.record.previousYear")}>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => {
+										const previous = value.subtract(1, "year");
+										onChange(previous);
+										selectDate(previous);
+									}}
+									aria-label={t("sys.record.previousYear")}
+								>
+									<Icon icon="solar:double-alt-arrow-left-linear" size={20} />
+								</Button>
+							</Tooltip>
+							<Tooltip title={t("sys.record.previousMonth")}>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => {
+										const previous = value.subtract(1, "month");
+										onChange(previous);
+										selectDate(previous);
+									}}
+									aria-label={t("sys.record.previousMonth")}
+								>
+									<Icon icon="solar:alt-arrow-left-linear" size={20} />
+								</Button>
+							</Tooltip>
+						</Space>
+						<Typography.Title level={4} style={{ margin: 0 }}>
+							{i18n.resolvedLanguage === "zh_CN" ? value.format("YYYY年 M月") : value.format("MMMM YYYY")}
+						</Typography.Title>
+						<Space size={2}>
+							<Button
+								variant="outline"
+								onClick={() => {
+									const today = dayjs();
+									onChange(today);
+									selectDate(today);
+								}}
+							>
+								{t("sys.record.today")}
+							</Button>
+							<Tooltip title={t("sys.record.nextMonth")}>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => {
+										const next = value.add(1, "month");
+										onChange(next);
+										selectDate(next);
+									}}
+									aria-label={t("sys.record.nextMonth")}
+								>
+									<Icon icon="solar:alt-arrow-right-linear" size={20} />
+								</Button>
+							</Tooltip>
+							<Tooltip title={t("sys.record.nextYear")}>
+								<Button
+									variant="ghost"
+									size="icon"
+									onClick={() => {
+										const next = value.add(1, "year");
+										onChange(next);
+										selectDate(next);
+									}}
+									aria-label={t("sys.record.nextYear")}
+								>
+									<Icon icon="solar:double-alt-arrow-right-linear" size={20} />
+								</Button>
+							</Tooltip>
+						</Space>
+					</CalendarHeader>
+				)}
+				fullCellRender={(date, info) => {
+					if (info.type !== "date") return info.originNode;
+
+					const key = dateKey(date);
+					const dotItems = summaryByDate.get(key) ?? [];
+					const hoverRecords = hoverRecordsByDate[key];
+					const isPopoverOpen = !createOpen && openPopoverDate === key;
+					const hasHiddenDots = dotItems.length > dotCapacity.full;
+					const visibleDotCount = hasHiddenDots ? dotCapacity.withEllipsis : dotItems.length;
+					const openCreateModal = () => {
+						openCreateModalForDate(date);
+					};
+					const hoverContent = isPopoverOpen ? (
+						<HoverContent>
+							<HoverRecordList $rows={dotItems.length}>
+								{!hoverRecords && (
+									<HoverLoading>
+										<Spin size="small" />
+									</HoverLoading>
+								)}
+								{(hoverRecords ?? []).map((record) => {
+									const theme = getRecordTheme(record.theme, themes);
+									return (
+										<HoverRecord key={record.id}>
+											<HoverTheme $color={record.themeColor ?? theme.color}>
+												{record.themeName ?? getRecordThemeLabel(theme, (translationKey) => t(translationKey))}
+											</HoverTheme>
+											<HoverTitle>{record.title}</HoverTitle>
+										</HoverRecord>
+									);
+								})}
+							</HoverRecordList>
+							<HoverActions $single={dotItems.length === 0}>
+								<Button type="button" size="sm" onClick={openCreateModal}>
+									{t("sys.record.new")}
+								</Button>
+								{dotItems.length > 0 && (
+									<Button type="button" size="sm" variant="outline" onClick={() => goDayDetail(key)}>
+										{t("sys.record.dayDetail")}
+									</Button>
+								)}
+							</HoverActions>
+						</HoverContent>
+					) : null;
+
+					const cell = (
+						<DateCell
+							data-record-date-cell="true"
+							$selected={date.isSame(selectedDate, "day")}
+							$today={key === todayKey}
+							$outside={!date.isSame(selectedDate, "month")}
+							onClick={() => {
+								if (createOpenRef.current) return;
+								if (isPopoverOpen) {
+									setOpenPopoverDate(null);
+									return;
+								}
+								openDatePopover(key);
+							}}
+						>
+							<DateNumber>{date.date()}</DateNumber>
+							<CellRecords data-record-dots="true" aria-label={t("sys.record.viewDate", { date: key })}>
+								{dotItems.slice(0, visibleDotCount).map((record) => (
+									<i key={record.id} aria-hidden="true" style={{ background: record.color }} />
+								))}
+								{dotItems.length > visibleDotCount && <span aria-hidden="true">…</span>}
+							</CellRecords>
+						</DateCell>
+					);
+
+					return isPopoverOpen ? (
+						<Popover
+							key={key}
+							content={hoverContent}
+							title={
+								<PopoverTitle>
+									<span>{`${key} · ${t("sys.record.dayRecordCount", { count: dotItems.length })}`}</span>
+									<PopoverCloseButton
+										type="button"
+										aria-label={i18n.resolvedLanguage === "zh_CN" ? "关闭浮窗" : "Close popover"}
+										onPointerDown={(event) => event.stopPropagation()}
+										onClick={(event) => {
+											event.stopPropagation();
+											setOpenPopoverDate(null);
+										}}
+									>
+										×
+									</PopoverCloseButton>
+								</PopoverTitle>
+							}
+							trigger={[]}
+							open
+							placement="top"
+							overlayClassName="record-date-popover"
+							onOpenChange={(open) => {
+								if (!open) setOpenPopoverDate(null);
+							}}
+						>
+							{cell}
+						</Popover>
+					) : (
+						cell
+					);
+				}}
+			/>
+		),
+		[
+			selectedDate,
+			selectDate,
+			t,
+			i18n.resolvedLanguage,
+			summaryByDate,
+			hoverRecordsByDate,
+			createOpen,
+			openPopoverDate,
+			dotCapacity,
+			themes,
+			todayKey,
+			openCreateModalForDate,
+			goDayDetail,
+			openDatePopover,
+		],
+	);
 
 	return (
 		<Page>
@@ -492,194 +741,11 @@ export default function RecordPage() {
 			</Flex>
 
 			<Workspace>
-				<CalendarCard
-					ref={calendarCardRef}
-					styles={{ body: { padding: isMobile ? "8px 8px 4px" : "12px 16px 8px" } }}
-				>
+				<CalendarCard ref={calendarCardRef} styles={{ body: { padding: isMobile ? "8px 8px 4px" : "12px 16px 8px" } }}>
 					<CalendarLoadingMask $show={calendarLoading}>
-                        <Spin size="large" />
-                    </CalendarLoadingMask>
-					<Calendar
-						value={selectedDate}
-						onSelect={selectDate}
-						headerRender={({ value, onChange }) => (
-							<CalendarHeader>
-								<Space size={2}>
-									<Tooltip title={t("sys.record.previousYear")}>
-										<Button
-											variant="ghost"
-											size="icon"
-											onClick={() => {
-												const previous = value.subtract(1, "year");
-												onChange(previous);
-												selectDate(previous);
-											}}
-											aria-label={t("sys.record.previousYear")}
-										>
-											<Icon icon="solar:double-alt-arrow-left-linear" size={20} />
-										</Button>
-									</Tooltip>
-									<Tooltip title={t("sys.record.previousMonth")}>
-										<Button
-											variant="ghost"
-											size="icon"
-											onClick={() => {
-												const previous = value.subtract(1, "month");
-												onChange(previous);
-												selectDate(previous);
-											}}
-											aria-label={t("sys.record.previousMonth")}
-										>
-											<Icon icon="solar:alt-arrow-left-linear" size={20} />
-										</Button>
-									</Tooltip>
-								</Space>
-								<Typography.Title level={4} style={{ margin: 0 }}>
-									{i18n.resolvedLanguage === "zh_CN" ? value.format("YYYY年 M月") : value.format("MMMM YYYY")}
-								</Typography.Title>
-								<Space size={2}>
-									<Button
-										variant="outline"
-										onClick={() => {
-											const today = dayjs();
-											onChange(today);
-											selectDate(today);
-										}}
-									>
-										{t("sys.record.today")}
-									</Button>
-									<Tooltip title={t("sys.record.nextMonth")}>
-										<Button
-											variant="ghost"
-											size="icon"
-											onClick={() => {
-												const next = value.add(1, "month");
-												onChange(next);
-												selectDate(next);
-											}}
-											aria-label={t("sys.record.nextMonth")}
-										>
-											<Icon icon="solar:alt-arrow-right-linear" size={20} />
-										</Button>
-									</Tooltip>
-									<Tooltip title={t("sys.record.nextYear")}>
-										<Button
-											variant="ghost"
-											size="icon"
-											onClick={() => {
-												const next = value.add(1, "year");
-												onChange(next);
-												selectDate(next);
-											}}
-											aria-label={t("sys.record.nextYear")}
-										>
-											<Icon icon="solar:double-alt-arrow-right-linear" size={20} />
-										</Button>
-									</Tooltip>
-								</Space>
-							</CalendarHeader>
-						)}
-						fullCellRender={(date, info) => {
-							if (info.type !== "date") return info.originNode;
-
-							const key = dateKey(date);
-							const dotItems = summaryByDate.get(key) ?? [];
-							const hoverRecords = hoverRecordsByDate[key];
-							const isPopoverOpen = !createOpen && openPopoverDate === key;
-							const hasHiddenDots = dotItems.length > dotCapacity.full;
-							const visibleDotCount = hasHiddenDots ? dotCapacity.withEllipsis : dotItems.length;
-							const openCreateModal = () => {
-								openCreateModalForDate(date);
-							};
-							const hoverContent = isPopoverOpen ? (
-								<HoverContent>
-									<HoverRecordList $rows={dotItems.length}>
-										{!hoverRecords && (
-											<HoverLoading><Spin size="small" /></HoverLoading>
-										)}
-										{(hoverRecords ?? []).map((record) => {
-											const theme = getRecordTheme(record.theme, themes);
-											return (
-												<HoverRecord key={record.id}>
-													<HoverTheme $color={record.themeColor ?? theme.color}>
-														{record.themeName ?? getRecordThemeLabel(theme, (translationKey) => t(translationKey))}
-													</HoverTheme>
-													<HoverTitle>{record.title}</HoverTitle>
-												</HoverRecord>
-											);
-										})}
-									</HoverRecordList>
-								<HoverActions $single={dotItems.length === 0}>
-									<Button type="button" size="sm" onClick={openCreateModal}>
-										{t("sys.record.new")}
-									</Button>
-									{dotItems.length > 0 && (
-										<Button type="button" size="sm" variant="outline" onClick={() => goDayDetail(key)}>
-											{t("sys.record.dayDetail")}
-										</Button>
-									)}
-								</HoverActions>
-								</HoverContent>
-							) : null;
-
-							const cell = (
-								<DateCell
-									data-record-date-cell="true"
-									$selected={date.isSame(selectedDate, "day")}
-									$today={key === todayKey}
-									$outside={!date.isSame(selectedDate, "month")}
-									onClick={() => {
-										if (createOpenRef.current) return;
-										if (isPopoverOpen) {
-											updateOpenPopoverDate(null);
-											return;
-										}
-										openDatePopover(key);
-									}}
-								>
-									<DateNumber>{date.date()}</DateNumber>
-									<CellRecords data-record-dots="true" aria-label={t("sys.record.viewDate", { date: key })}>
-										{dotItems.slice(0, visibleDotCount).map((record) => (
-											<i key={record.id} aria-hidden="true" style={{ background: record.color }} />
-										))}
-										{dotItems.length > visibleDotCount && <span aria-hidden="true">…</span>}
-									</CellRecords>
-								</DateCell>
-							);
-
-							return isPopoverOpen ? (
-								<Popover
-									key={key}
-									content={hoverContent}
-									title={
-										<PopoverTitle>
-											<span>{`${key} · ${t("sys.record.dayRecordCount", { count: dotItems.length })}`}</span>
-											<PopoverCloseButton
-												type="button"
-												aria-label={i18n.resolvedLanguage === "zh_CN" ? "关闭浮窗" : "Close popover"}
-												onPointerDown={(event) => event.stopPropagation()}
-												onClick={(event) => {
-													event.stopPropagation();
-													updateOpenPopoverDate(null);
-												}}
-											>
-												×
-											</PopoverCloseButton>
-										</PopoverTitle>
-									}
-									trigger={[]}
-									open
-									placement="top"
-									overlayClassName="record-date-popover"
-									onOpenChange={(open) => {
-										if (!open) updateOpenPopoverDate(null);
-									}}
-								>
-									{cell}
-								</Popover>
-							) : cell;
-						}}
-					/>
+						<Spin size="large" />
+					</CalendarLoadingMask>
+					{calendar}
 				</CalendarCard>
 
 				{!isMobile && (
@@ -694,7 +760,9 @@ export default function RecordPage() {
 								<Button
 									variant="link"
 									size="sm"
-									onClick={() => navigate(`/record/day/${dateKey(selectedDate)}`, { state: { selectedDate: selectedDateKey } })}
+									onClick={() =>
+										navigate(`/record/day/${dateKey(selectedDate)}`, { state: { selectedDate: selectedDateKey } })
+									}
 								>
 									{t("sys.record.viewAllToday")}
 								</Button>
@@ -712,11 +780,13 @@ export default function RecordPage() {
 							themes={themes}
 							enablePagination
 							pageSize={5}
-							onSelect={(record) => navigate(`/record/detail/${record.id}`, { state: { from: "calendar", selectedDate: selectedDateKey } })}
-								onDelete={(id) => {
-									void handleDelete(id);
-								}}
-							/>
+							onSelect={(record) =>
+								navigate(`/record/detail/${record.id}`, { state: { from: "calendar", selectedDate: selectedDateKey } })
+							}
+							onDelete={(id) => {
+								void handleDelete(id);
+							}}
+						/>
 						<DayLoadingMask $show={dayLoading}>
 							<Spin size="large" />
 						</DayLoadingMask>
@@ -1042,6 +1112,3 @@ const CellRecords = styled.div`
 		span { font-size: 11px; }
 	}
 `;
-
-
-

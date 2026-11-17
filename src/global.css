@@ -64,6 +64,7 @@
 
 /* Shadcn UI Light Theme */
 :root {
+  color-scheme: light;
   --radius: 0.5rem;
   --background: var(--colors-common-white);
   --foreground: var(--colors-common-black);
@@ -100,20 +101,21 @@
 
 /* Shadcn UI Dark Theme */
 [data-theme-mode="dark"] {
-  --background: var(--colors-common-black);
-  --foreground: var(--colors-common-white);
-  --card: var(--colors-common-black);
-  --card-foreground: var(--colors-common-white);
-  --popover: var(--colors-common-black);
-  --popover-foreground: var(--colors-common-white);
+  color-scheme: dark;
+  --background: var(--colors-background-default);
+  --foreground: #edf0f4;
+  --card: var(--colors-background-paper);
+  --card-foreground: var(--foreground);
+  --popover: var(--colors-background-paper);
+  --popover-foreground: var(--foreground);
   --primary: var(--colors-palette-primary-default);
   --primary-foreground: var(--colors-palette-primary-darker);
   --secondary: var(--colors-background-neutral);
-  --secondary-foreground: var(--colors-palette-gray-500);
+  --secondary-foreground: #d2d7df;
   --muted: var(--colors-background-neutral);
-  --muted-foreground: var(--colors-palette-gray-400);
+  --muted-foreground: #a1a9b6;
   --accent: var(--colors-background-neutral);
-  --accent-foreground: var(--colors-palette-gray-500);
+  --accent-foreground: var(--foreground);
   --destructive: var(--colors-palette-error-default);
   --border: rgba(var(--colors-palette-gray-500Channel)/ var(--opacity-border));
   --input: rgba(var(--colors-palette-gray-500Channel)/ var(--opacity-border));
@@ -123,7 +125,7 @@
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: var(--colors-background-neutral);
+  --sidebar: var(--colors-background-default);
   --sidebar-foreground: var(--colors-common-white);
   --sidebar-primary: var(--colors-palette-primary-default);
   --sidebar-primary-foreground: var(--colors-palette-primary-darker);
@@ -131,6 +133,26 @@
   --sidebar-accent-foreground: var(--colors-common-white);
   --sidebar-border: rgba(var(--colors-palette-gray-500Channel)/ var(--opacity-border));
   --sidebar-ring: var(--colors-palette-primary-default);
+}
+
+/* Keep glass controls on the same surface scale as Ant Design and Shadcn. */
+:root[data-theme-mode="dark"] {
+  --lg-fill: rgb(41 45 53 / 0.88);
+  --lg-fill-pressed: rgb(51 56 65 / 0.96);
+  --lg-panel-fill: var(--card);
+  --lg-menu-fill: var(--popover);
+  --lg-fg: var(--foreground);
+  --lg-fg-muted: var(--muted-foreground);
+  --lg-fg-faint: #858e9d;
+  --lg-edge: rgb(255 255 255 / 0.1);
+  --lg-glow: rgb(255 255 255 / 0.06);
+  --lg-rim-opacity: 0.35;
+  --lg-brightness: 1;
+  --lg-saturate: 1.15;
+  --lg-track: #454c58;
+  --lg-rail: #3b424d;
+  --lg-tab-selection: rgb(255 255 255 / 0.08);
+  --lg-shadow: 0 4px 16px rgb(0 0 0 / 0.14);
 }
 
 /* slash layout */
