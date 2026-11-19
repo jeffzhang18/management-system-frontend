@@ -163,3 +163,18 @@
   --layout-header-height: 64px;
   --layout-multi-tabs-height: 48px;
 }
+
+/*
+ * iOS Safari zooms the page when a focused field has a computed font-size
+ * below 16px and never zooms back out. Keep every editable control at 16px on
+ * touch devices. !important is needed to beat Ant Design's css-in-js rules.
+ */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="color"]),
+  textarea,
+  select,
+  [contenteditable="true"],
+  .ql-editor {
+    font-size: 16px !important;
+  }
+}
