@@ -4,7 +4,12 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { Role, UserInfo, UserToken } from "#/entity";
 import { StorageEnum } from "#/enum";
-import userService, { type SignInReq, type SignInRes, type SignUpReq } from "@/api/services/userService";
+import userService, {
+	type EmailCodeSignInReq,
+	type SignInReq,
+	type SignInRes,
+	type SignUpReq,
+} from "@/api/services/userService";
 import { removeItem } from "@/utils/storage";
 
 type UserStore = {
@@ -60,7 +65,7 @@ const normalizeUserInfo = (user: RawUserInfo): Partial<UserInfo> => {
 	};
 };
 
-const persistAuthPayload = (
+export const saveAuthSession = (
 	res: SignInRes,
 	setUserToken: (token: UserToken) => void,
 	setUserInfo: (userInfo: UserInfo) => void,
@@ -121,7 +126,7 @@ export const useSignIn = () => {
 	const signIn = async (data: SignInReq) => {
 		try {
 			const res = await signInMutation.mutateAsync(data);
-			persistAuthPayload(res, setUserToken, setUserInfo);
+			saveAuthSession(res, setUserToken, setUserInfo);
 		} catch (err) {
 			toast.error(err.message, {
 				position: "top-center",
@@ -131,6 +136,16 @@ export const useSignIn = () => {
 	};
 
 	return signIn;
+};
+
+export const useEmailCodeSignIn = () => {
+	const { setUserToken, setUserInfo } = useUserActions();
+	const mutation = useMutation({ mutationFn: userService.signinWithEmailCode });
+
+	return async (data: EmailCodeSignInReq) => {
+		const res = await mutation.mutateAsync(data);
+		saveAuthSession(res, setUserToken, setUserInfo);
+	};
 };
 
 export const useSignUp = () => {
@@ -143,7 +158,7 @@ export const useSignUp = () => {
 	const signUp = async (data: SignUpReq) => {
 		try {
 			const res = await signUpMutation.mutateAsync(data);
-			persistAuthPayload(res, setUserToken, setUserInfo);
+			saveAuthSession(res, setUserToken, setUserInfo);
 			return res;
 		} catch (err) {
 			toast.error(err.message, {

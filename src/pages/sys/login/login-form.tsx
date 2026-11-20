@@ -1,4 +1,4 @@
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { DB_USER } from "@/_mock/assets_backup";
 import type { SignInReq } from "@/api/services/userService";
 import { Icon } from "@/components/icon";
+import PasskeyLoginButton from "@/components/passkeys/login-button";
 import { GLOBAL_CONFIG } from "@/global-config";
 import { useSignIn } from "@/store/userStore";
 import { Button } from "@/ui/button";
@@ -112,13 +113,35 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 						{t("sys.login.loginButton")}
 					</Button>
 
+					<Button
+						type="button"
+						variant="outline"
+						className="w-full"
+						onClick={() => setLoginState(LoginStateEnum.EMAIL_CODE)}
+					>
+						<Mail size={20} />
+						{t("sys.login.emailCodeSignInTitle")}
+					</Button>
+
+					<PasskeyLoginButton />
+
 					{/* 手机登录/二维码登录 */}
 					<div className="grid gap-4 sm:grid-cols-2">
-						<Button type="button" variant="outline" className="w-full" onClick={() => setLoginState(LoginStateEnum.MOBILE)}>
+						<Button
+							type="button"
+							variant="outline"
+							className="w-full"
+							onClick={() => setLoginState(LoginStateEnum.MOBILE)}
+						>
 							<Icon icon="uil:mobile-android" size={20} />
 							{t("sys.login.mobileSignInFormTitle")}
 						</Button>
-						<Button type="button" variant="outline" className="w-full" onClick={() => setLoginState(LoginStateEnum.QR_CODE)}>
+						<Button
+							type="button"
+							variant="outline"
+							className="w-full"
+							onClick={() => setLoginState(LoginStateEnum.QR_CODE)}
+						>
 							<Icon icon="uil:qrcode-scan" size={20} />
 							{t("sys.login.qrSignInFormTitle")}
 						</Button>
@@ -143,7 +166,12 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 					{/* 注册 */}
 					<div className="text-center text-sm">
 						{t("sys.login.noAccount")}
-						<Button type="button" variant="link" className="px-1" onClick={() => setLoginState(LoginStateEnum.REGISTER)}>
+						<Button
+							type="button"
+							variant="link"
+							className="px-1"
+							onClick={() => setLoginState(LoginStateEnum.REGISTER)}
+						>
 							{t("sys.login.signUpFormTitle")}
 						</Button>
 					</div>
@@ -154,4 +182,3 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 }
 
 export default LoginForm;
-

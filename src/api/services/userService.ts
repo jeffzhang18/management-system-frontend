@@ -6,8 +6,17 @@ export interface SignInReq {
 	password: string;
 }
 
+export interface EmailCodeSignInReq {
+	email: string;
+	code: string;
+}
+
 export interface SignUpReq extends SignInReq {
 	userName: string;
+	code: string;
+}
+
+export interface ResetPasswordReq extends SignInReq {
 	code: string;
 }
 
@@ -28,8 +37,12 @@ export type SignInRes = UserToken & { user: UserInfo };
 
 export enum UserApi {
 	SignIn = "/auth/login",
+	SendLoginCode = "/auth/login/email/code",
+	EmailCodeSignIn = "/auth/login/email",
 	SignUp = "/auth/register",
 	SendRegisterCode = "/auth/register/code",
+	SendResetPasswordCode = "/auth/reset-password/code",
+	ResetPassword = "/auth/reset-password",
 	// 以下接口还未实现
 	Logout = "/auth/logout",
 	Refresh = "/auth/refresh-token",
@@ -38,9 +51,17 @@ export enum UserApi {
 }
 
 const signin = (data: SignInReq) => apiClient.post<SignInRes>({ url: UserApi.SignIn, data });
+const sendLoginCode = (email: string) =>
+	apiClient.post<{ sent: boolean }>({ url: UserApi.SendLoginCode, data: { email } });
+const signinWithEmailCode = (data: EmailCodeSignInReq) =>
+	apiClient.post<SignInRes>({ url: UserApi.EmailCodeSignIn, data });
 const signup = (data: SignUpReq) => apiClient.post<SignInRes>({ url: UserApi.SignUp, data });
 const sendRegisterCode = (email: string) =>
 	apiClient.post<{ sent: boolean }>({ url: UserApi.SendRegisterCode, data: { email } });
+const sendResetPasswordCode = (email: string) =>
+	apiClient.post<{ sent: boolean }>({ url: UserApi.SendResetPasswordCode, data: { email } });
+const resetPassword = (data: ResetPasswordReq) =>
+	apiClient.post<{ message: string }>({ url: UserApi.ResetPassword, data });
 const logout = () => apiClient.get({ url: UserApi.Logout });
 const findById = (id: string) => apiClient.get<UserInfo | UserInfo[]>({ url: `${UserApi.User}/${id}` });
 const updateById = (id: string, data: Partial<UserInfo> & Record<string, unknown>) =>
@@ -50,8 +71,12 @@ const updateProfile = (data: UpdateUserProfileReq) =>
 
 export default {
 	signin,
+	sendLoginCode,
+	signinWithEmailCode,
 	signup,
 	sendRegisterCode,
+	sendResetPasswordCode,
+	resetPassword,
 	findById,
 	updateById,
 	updateProfile,

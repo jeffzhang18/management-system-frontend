@@ -64,6 +64,9 @@ importers:
       '@react-three/fiber':
         specifier: ^9.8.1
         version: 9.8.1(@types/react@19.1.2)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(three@0.186.1)
+      '@simplewebauthn/browser':
+        specifier: 14.0.0
+        version: 14.0.0
       '@tailwindcss/vite':
         specifier: ^4.1.3
         version: 4.1.4(vite@6.3.3(@types/node@20.5.1)(jiti@2.4.2)(lightningcss@1.29.2)(tsx@4.19.4))
@@ -5026,6 +5029,10 @@ packages:
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
+
+  '@simplewebauthn/browser@14.0.0':
+    resolution: {integrity: sha512-1odWVqeEBTl7lJ9zMKLEsmTlnyrDO5iRcTvfMKKk1WThUnp/i8JJdffdj2icP+tty159s4PgwE3BiMoEW9NFow==}
+
 
 snapshots:
 
@@ -10206,3 +10213,5 @@ snapshots:
       use-sync-external-store: 1.5.0(react@19.1.0)
 
   zwitch@2.0.4: {}
+
+  '@simplewebauthn/browser@14.0.0': {}

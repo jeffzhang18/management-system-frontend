@@ -1,4 +1,4 @@
-import { type PropsWithChildren, createContext, useContext, useMemo, useState } from "react";
+import { createContext, type PropsWithChildren, useContext, useMemo, useState } from "react";
 
 export enum LoginStateEnum {
 	LOGIN = 0,
@@ -6,6 +6,7 @@ export enum LoginStateEnum {
 	RESET_PASSWORD = 2,
 	MOBILE = 3,
 	QR_CODE = 4,
+	EMAIL_CODE = 5,
 }
 
 interface LoginStateContextType {
