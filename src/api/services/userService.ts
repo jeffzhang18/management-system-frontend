@@ -8,6 +8,7 @@ export interface SignInReq {
 
 export interface SignUpReq extends SignInReq {
 	userName: string;
+	code: string;
 }
 
 export interface UpdateUserProfileReq {
@@ -28,6 +29,7 @@ export type SignInRes = UserToken & { user: UserInfo };
 export enum UserApi {
 	SignIn = "/auth/login",
 	SignUp = "/auth/register",
+	SendRegisterCode = "/auth/register/code",
 	// 以下接口还未实现
 	Logout = "/auth/logout",
 	Refresh = "/auth/refresh-token",
@@ -37,6 +39,8 @@ export enum UserApi {
 
 const signin = (data: SignInReq) => apiClient.post<SignInRes>({ url: UserApi.SignIn, data });
 const signup = (data: SignUpReq) => apiClient.post<SignInRes>({ url: UserApi.SignUp, data });
+const sendRegisterCode = (email: string) =>
+	apiClient.post<{ sent: boolean }>({ url: UserApi.SendRegisterCode, data: { email } });
 const logout = () => apiClient.get({ url: UserApi.Logout });
 const findById = (id: string) => apiClient.get<UserInfo | UserInfo[]>({ url: `${UserApi.User}/${id}` });
 const updateById = (id: string, data: Partial<UserInfo> & Record<string, unknown>) =>
@@ -47,6 +51,7 @@ const updateProfile = (data: UpdateUserProfileReq) =>
 export default {
 	signin,
 	signup,
+	sendRegisterCode,
 	findById,
 	updateById,
 	updateProfile,

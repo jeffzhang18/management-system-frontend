@@ -1,6 +1,8 @@
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
-import type { SignUpReq } from "@/api/services/userService";
+import { toast } from "sonner";
+import userService, { type SignUpReq } from "@/api/services/userService";
 import { useSignUp } from "@/store/userStore";
 import { Button } from "@/ui/button";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/ui/form";
@@ -8,30 +10,66 @@ import { Input } from "@/ui/input";
 import { ReturnButton } from "./components/ReturnButton";
 import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider";
 
+const CODE_COOLDOWN_SECONDS = 60;
+const COOLDOWN_STORAGE_KEY = "register-code-available-at";
+
+const getRemainingSeconds = () => {
+	const availableAt = Number(localStorage.getItem(COOLDOWN_STORAGE_KEY) || 0);
+	return Math.max(0, Math.ceil((availableAt - Date.now()) / 1000));
+};
+
 function RegisterForm() {
 	const { t } = useTranslation();
 	const { loginState, backToLogin } = useLoginStateContext();
 	const signUp = useSignUp();
+	const [countdown, setCountdown] = useState(getRemainingSeconds);
+	const [sending, setSending] = useState(false);
 
 	const form = useForm({
 		defaultValues: {
 			username: "",
 			email: "",
+			code: "",
 			password: "",
 			confirmPassword: "",
 		},
 	});
 
+	useEffect(() => {
+		if (countdown <= 0) return;
+		const timer = window.setTimeout(() => setCountdown(getRemainingSeconds()), 1000);
+		return () => window.clearTimeout(timer);
+	}, [countdown]);
+
+	const sendCode = useCallback(async () => {
+		if (sending || getRemainingSeconds() > 0) return;
+		const valid = await form.trigger("email");
+		const email = form.getValues("email").trim();
+		if (!valid || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+			toast.error(t("sys.login.emailInvalid"), { position: "top-center" });
+			return;
+		}
+		setSending(true);
+		try {
+			await userService.sendRegisterCode(email);
+			localStorage.setItem(COOLDOWN_STORAGE_KEY, String(Date.now() + CODE_COOLDOWN_SECONDS * 1000));
+			setCountdown(CODE_COOLDOWN_SECONDS);
+			toast.success(t("sys.login.codeSent"), { position: "top-center" });
+		} finally {
+			setSending(false);
+		}
+	}, [form, sending, t]);
+
 	const onFinish = async (values: any) => {
-		console.log("Received values of form: ", values);
 		const signUpReq: SignUpReq = {
-			email: values.email,
+			email: values.email.trim(),
 			userName: values.username,
 			password: values.password,
+			code: values.code.trim(),
 		};
 
-		await signUp(signUpReq);
-		backToLogin();
+		const res = await signUp(signUpReq);
+		if (res) backToLogin();
 	};
 
 	if (loginState !== LoginStateEnum.REGISTER) return null;
@@ -66,6 +104,34 @@ function RegisterForm() {
 							<FormControl>
 								<Input placeholder={t("sys.login.email")} {...field} />
 							</FormControl>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
+
+				<FormField
+					control={form.control}
+					name="code"
+					rules={{
+						required: t("sys.login.codePlaceholder"),
+						pattern: { value: /^\d{6}$/, message: t("sys.login.codeInvalid") },
+					}}
+					render={({ field }) => (
+						<FormItem>
+							<div className="flex gap-2">
+								<FormControl>
+									<Input inputMode="numeric" maxLength={6} placeholder={t("sys.login.code")} {...field} />
+								</FormControl>
+								<Button
+									type="button"
+									variant="outline"
+									className="shrink-0"
+									disabled={sending || countdown > 0}
+									onClick={sendCode}
+								>
+									{countdown > 0 ? t("sys.login.resendIn", { seconds: countdown }) : t("sys.login.sendCode")}
+								</Button>
+							</div>
 							<FormMessage />
 						</FormItem>
 					)}

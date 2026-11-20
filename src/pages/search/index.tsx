@@ -24,8 +24,18 @@ function SearchContent({ userId }: { userId?: string }) {
 	const l = useLabels();
 	const client = useQueryClient();
 	const key = ["search", userId];
-	const settings = useQuery({ queryKey: [...key, "settings"], queryFn: searchService.settings, retry: false });
-	const bookmarks = useQuery({ queryKey: [...key, "bookmarks"], queryFn: searchService.bookmarks, retry: false });
+	const settings = useQuery({
+		queryKey: [...key, "settings"],
+		queryFn: searchService.settings,
+		retry: false,
+		enabled: !!userId,
+	});
+	const bookmarks = useQuery({
+		queryKey: [...key, "bookmarks"],
+		queryFn: searchService.bookmarks,
+		retry: false,
+		enabled: !!userId,
+	});
 	const [draft, setDraft] = useState<SearchSettings | null>(null);
 	const effective = { ...defaults, ...(draft || settings.data) };
 	const gradient = validGradient(effective) ? effective : defaults;
