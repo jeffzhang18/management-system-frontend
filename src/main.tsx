@@ -11,7 +11,9 @@ import { GLOBAL_CONFIG } from "./global-config";
 import ErrorBoundary from "./routes/components/error-boundary";
 import { routesSection } from "./routes/sections";
 import { urlJoin } from "./utils";
+import { lockViewportScaleOnFocus } from "./utils/lock-viewport-scale-on-focus";
 
+lockViewportScaleOnFocus();
 await registerLocalIcons();
 
 if (GLOBAL_CONFIG.enableMock) {

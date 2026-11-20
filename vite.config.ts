@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
 
 			isProduction &&
 				visualizer({
-					open: true,
+					open: !process.env.CI,
 					gzipSize: true,
 					brotliSize: true,
 					template: "treemap",

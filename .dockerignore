@@ -1,0 +1,15 @@
+node_modules
+dist
+dist-ssr
+.git
+.github
+.cursor
+.idx
+.learnings
+.playwright-cli
+.theme-qa.local
+.vscode
+stats.html
+*.log
+Dockerfile
+docker-compose.yaml
