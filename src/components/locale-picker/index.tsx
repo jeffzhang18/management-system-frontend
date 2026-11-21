@@ -10,7 +10,7 @@ type Locale = keyof typeof LocalEnum;
  * Locale Picker
  */
 export default function LocalePicker() {
-	const { setLocale, locale } = useLocale();
+	const { setLocale, locale, t } = useLocale();
 
 	const localeList = Object.values(LANGUAGE_MAP).map((item) => {
 		return {
@@ -23,7 +23,7 @@ export default function LocalePicker() {
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<Button variant="ghost" size="icon" className="rounded-full">
+				<Button variant="ghost" size="icon" className="rounded-full" aria-label={t("sys.login.languageSelection")}>
 					<Icon icon={`local:${LANGUAGE_MAP[locale].icon}`} size="20" />
 				</Button>
 			</DropdownMenuTrigger>

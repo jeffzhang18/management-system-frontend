@@ -62,6 +62,7 @@
 			"deleted": "通行密钥已删除。"
 		},
 		"login": {
+			"languageSelection": "选择语言",
 			"accountPlaceholder": "请输入用户名",
 			"backSignIn": "返回登录",
 			"confirmPassword": "确认密码",

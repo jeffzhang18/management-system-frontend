@@ -62,6 +62,7 @@
 			"deleted": "Passkey deleted."
 		},
 		"login": {
+			"languageSelection": "Choose language",
 			"accountPlaceholder": "Please input username",
 			"backSignIn": "Back sign in",
 			"confirmPassword": "Confirm Password",

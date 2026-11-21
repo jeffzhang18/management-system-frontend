@@ -13,11 +13,13 @@ import uiSettingsService from "@/api/services/uiSettingsService";
 import userService from "@/api/services/userService";
 import { useUserActions, useUserInfo, useUserToken } from "@/store/userStore";
 import i18nInstance from "./i18n";
+import { htmlLanguage, normalizeLocale } from "./locale";
 
 dayjs.extend(updateLocale);
 dayjs.updateLocale("zh-cn", { weekStart: 0 });
 
 type Locale = keyof typeof LocalEnum;
+const mapLocaleToDayjsLocale = (locale: Locale) => (locale === LocalEnum.zh_CN ? "zh-cn" : "en");
 type Language = {
 	locale: keyof typeof LocalEnum;
 	icon: string;
@@ -40,17 +42,17 @@ export const LANGUAGE_MAP: Record<Locale, Language> = {
 	},
 };
 
-export const isLocale = (value: unknown): value is Locale => typeof value === "string" && value in LANGUAGE_MAP;
+export const isLocale = (value: unknown): value is Locale => value === LocalEnum.en_US || value === LocalEnum.zh_CN;
 
 export const getCurrentLocale = (): Locale => {
 	const current = i18nInstance.resolvedLanguage || i18nInstance.language;
-	return isLocale(current) ? current : LocalEnum.en_US;
+	return normalizeLocale(current) || LocalEnum.en_US;
 };
 
 export const applyLocaleSetting = (nextLocale: Locale) => {
 	void i18nInstance.changeLanguage(nextLocale);
 	localStorage.setItem(StorageEnum.I18N, nextLocale);
-	document.documentElement.lang = nextLocale;
+	document.documentElement.lang = htmlLanguage(nextLocale);
 	dayjs.locale(nextLocale === LocalEnum.zh_CN ? "zh-cn" : "en");
 };
 
@@ -60,15 +62,14 @@ export default function useLocale() {
 	const userInfo = useUserInfo();
 	const { setUserInfo } = useUserActions();
 
-	const locale = (i18n.resolvedLanguage || LocalEnum.en_US) as Locale;
+	const locale = normalizeLocale(i18n.resolvedLanguage || i18n.language) || LocalEnum.en_US;
 	const language = LANGUAGE_MAP[locale];
-	const mapLocaleToDayjsLocale = (nextLocale: Locale) => (nextLocale === LocalEnum.zh_CN ? "zh-cn" : "en");
 
 	const applyLocale = useCallback(
 		(nextLocale: Locale) => {
 			void i18n.changeLanguage(nextLocale);
 			localStorage.setItem(StorageEnum.I18N, nextLocale);
-			document.documentElement.lang = nextLocale;
+			document.documentElement.lang = htmlLanguage(nextLocale);
 			dayjs.locale(mapLocaleToDayjsLocale(nextLocale));
 		},
 		[i18n],
@@ -82,22 +83,13 @@ export default function useLocale() {
 		return nextLocale === LocalEnum.zh_CN ? "zh-CN" : "en-US";
 	};
 
-	useEffect(() => {
-		if (!accessToken && locale !== LocalEnum.en_US) {
-			applyLocale(LocalEnum.en_US);
-		}
-	}, [accessToken, applyLocale, locale]);
-
 	/**
 	 * localstorage -> i18nextLng change
 	 */
 	const setLocale = async (nextLocale: Locale) => {
-		if (!accessToken) {
-			applyLocale(LocalEnum.en_US);
-			return;
-		}
-
 		applyLocale(nextLocale);
+		// Guest preferences stay local; protected settings APIs require a session.
+		if (!accessToken) return;
 		void uiSettingsService.save({ language: nextLocale }).catch(() => {});
 
 		const languageValue = mapLocaleToApiLanguage(nextLocale);
