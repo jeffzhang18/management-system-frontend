@@ -11,8 +11,10 @@ import { GLOBAL_CONFIG } from "./global-config";
 import ErrorBoundary from "./routes/components/error-boundary";
 import { routesSection } from "./routes/sections";
 import { urlJoin } from "./utils";
+import { registerChunkRecovery } from "./utils/chunk-recovery";
 import { lockViewportScaleOnFocus } from "./utils/lock-viewport-scale-on-focus";
 
+registerChunkRecovery();
 lockViewportScaleOnFocus();
 await registerLocalIcons();
 

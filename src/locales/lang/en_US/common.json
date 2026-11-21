@@ -9,15 +9,14 @@
 		"resetText": "Reset",
 		"searchText": "Search",
 		"queryText": "Search",
-
 		"inputText": "Please enter",
 		"chooseText": "Please choose",
-
 		"redo": "Refresh",
 		"back": "Back",
 		"more": "More",
-
 		"light": "Light",
-		"dark": "Dark"
+		"dark": "Dark",
+		"chunkLoadTitle": "Page resources could not be loaded",
+		"chunkLoadDescription": "The site may have just updated, or your connection was interrupted. Refresh to load the latest page."
 	}
 }

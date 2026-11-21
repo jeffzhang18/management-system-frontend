@@ -1,16 +1,32 @@
+import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
+import { isRouteErrorResponse, useRouteError } from "react-router";
 import { themeVars } from "@/theme/theme.css";
+import { Button } from "@/ui/button";
 import { ScrollArea } from "@/ui/scroll-area";
 import { Title } from "@/ui/typography";
-import type { CSSProperties } from "react";
-import { isRouteErrorResponse, useRouteError } from "react-router";
+import { isChunkLoadError } from "@/utils/chunk-recovery";
 
 export default function ErrorBoundary() {
 	const error = useRouteError();
+	const { t } = useTranslation();
 
 	return (
 		<ScrollArea className="w-full h-screen">
 			<div style={rootStyles()}>
-				<div style={containerStyles()}>{renderErrorMessage(error)}</div>
+				<div style={containerStyles()}>
+					{isChunkLoadError(error) ? (
+						<>
+							<Title as="h2">{t("common.chunkLoadTitle")}</Title>
+							<p>{t("common.chunkLoadDescription")}</p>
+							<Button type="button" onClick={() => window.location.reload()}>
+								{t("common.redo")}
+							</Button>
+						</>
+					) : (
+						renderErrorMessage(error)
+					)}
+				</div>
 			</div>
 		</ScrollArea>
 	);
