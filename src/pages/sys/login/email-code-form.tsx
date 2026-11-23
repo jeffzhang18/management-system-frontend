@@ -9,8 +9,9 @@ import { GLOBAL_CONFIG } from "@/global-config";
 import { useEmailCodeSignIn } from "@/store/userStore";
 import { Button } from "@/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/ui/form";
-import { Input } from "@/ui/input";
+import { Input } from "antd";
 import { ReturnButton } from "./components/ReturnButton";
+import { EmailInput } from "./email-input";
 import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider";
 
 const CODE_COOLDOWN_SECONDS = 60;
@@ -94,11 +95,12 @@ function EmailCodeForm() {
 						<FormItem>
 							<FormLabel>{t("sys.login.email")}</FormLabel>
 							<FormControl>
-								<Input
+								<EmailInput
 									disabled={sending || form.formState.isSubmitting}
-									autoComplete="email"
 									placeholder={t("sys.login.email")}
-									{...field}
+									value={field.value}
+									onChange={field.onChange}
+									onBlur={field.onBlur}
 								/>
 							</FormControl>
 							<FormMessage />
@@ -120,6 +122,7 @@ function EmailCodeForm() {
 								<FormControl>
 									<Input
 										disabled={form.formState.isSubmitting}
+										allowClear
 										autoComplete="one-time-code"
 										inputMode="numeric"
 										maxLength={6}

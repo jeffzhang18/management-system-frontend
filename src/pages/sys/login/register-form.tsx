@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import userService, { type SignUpReq } from "@/api/services/userService";
 import { useSignUp } from "@/store/userStore";
 import { Button } from "@/ui/button";
-import { Form, FormControl, FormField, FormItem, FormMessage } from "@/ui/form";
-import { Input } from "@/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/ui/form";
+import { Input } from "antd";
 import { ReturnButton } from "./components/ReturnButton";
+import { EmailInput } from "./email-input";
 import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider";
 
 const CODE_COOLDOWN_SECONDS = 60;
@@ -87,8 +88,9 @@ function RegisterForm() {
 					rules={{ required: t("sys.login.accountPlaceholder") }}
 					render={({ field }) => (
 						<FormItem>
+							<FormLabel>{t("sys.login.userName")}</FormLabel>
 							<FormControl>
-								<Input placeholder={t("sys.login.userName")} {...field} />
+								<Input allowClear placeholder={t("sys.login.userName")} {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -101,8 +103,14 @@ function RegisterForm() {
 					rules={{ required: t("sys.login.emaildPlaceholder") }}
 					render={({ field }) => (
 						<FormItem>
+							<FormLabel>{t("sys.login.email")}</FormLabel>
 							<FormControl>
-								<Input placeholder={t("sys.login.email")} {...field} />
+								<EmailInput
+									placeholder={t("sys.login.email")}
+									value={field.value}
+									onChange={field.onChange}
+									onBlur={field.onBlur}
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -118,9 +126,10 @@ function RegisterForm() {
 					}}
 					render={({ field }) => (
 						<FormItem>
+							<FormLabel>{t("sys.login.code")}</FormLabel>
 							<div className="flex gap-2">
 								<FormControl>
-									<Input inputMode="numeric" maxLength={6} placeholder={t("sys.login.code")} {...field} />
+									<Input allowClear inputMode="numeric" maxLength={6} placeholder={t("sys.login.code")} {...field} />
 								</FormControl>
 								<Button
 									type="button"
@@ -143,8 +152,9 @@ function RegisterForm() {
 					rules={{ required: t("sys.login.passwordPlaceholder") }}
 					render={({ field }) => (
 						<FormItem>
+							<FormLabel>{t("sys.login.password")}</FormLabel>
 							<FormControl>
-								<Input type="password" placeholder={t("sys.login.password")} {...field} />
+								<Input.Password allowClear placeholder={t("sys.login.password")} {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -160,8 +170,9 @@ function RegisterForm() {
 					}}
 					render={({ field }) => (
 						<FormItem>
+							<FormLabel>{t("sys.login.confirmPassword")}</FormLabel>
 							<FormControl>
-								<Input type="password" placeholder={t("sys.login.confirmPassword")} {...field} />
+								<Input.Password allowClear placeholder={t("sys.login.confirmPassword")} {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>

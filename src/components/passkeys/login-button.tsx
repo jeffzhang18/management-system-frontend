@@ -67,7 +67,6 @@ export default function PasskeyLoginButton() {
 				{loading ? <Loader2 className="animate-spin" /> : <Fingerprint />}
 				{t("sys.passkeys.loginButton")}
 			</Button>
-			<p className="text-xs text-muted-foreground">{t("sys.passkeys.localHint")}</p>
 			{!supported && (
 				<p className="text-xs text-muted-foreground" aria-live="polite">
 					{t("sys.passkeys.unsupported")}

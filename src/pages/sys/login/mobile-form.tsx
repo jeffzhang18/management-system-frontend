@@ -1,6 +1,6 @@
 import { Button } from "@/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/ui/form";
-import { Input } from "@/ui/input";
+import { Input } from "antd";
 import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from "@/ui/input-otp";
 import { REGEXP_ONLY_DIGITS_AND_CHARS } from "input-otp";
 import { useEffect, useState } from "react";
@@ -81,7 +81,7 @@ function MobileForm() {
 						<FormItem>
 							<FormLabel>{t("sys.login.mobile")}</FormLabel>
 							<FormControl>
-								<Input placeholder={t("sys.login.mobile")} {...field} />
+								<Input allowClear placeholder={t("sys.login.mobile")} {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>

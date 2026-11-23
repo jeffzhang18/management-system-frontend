@@ -6,8 +6,9 @@ import { toast } from "sonner";
 import userService, { type ResetPasswordReq } from "@/api/services/userService";
 import { Button } from "@/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/ui/form";
-import { Input } from "@/ui/input";
+import { Input } from "antd";
 import { ReturnButton } from "./components/ReturnButton";
+import { EmailInput } from "./email-input";
 import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider";
 
 const CODE_COOLDOWN_SECONDS = 60;
@@ -96,7 +97,12 @@ function ResetForm() {
 						<FormItem>
 							<FormLabel>{t("sys.login.email")}</FormLabel>
 							<FormControl>
-								<Input autoComplete="email" placeholder={t("sys.login.email")} {...field} />
+								<EmailInput
+									placeholder={t("sys.login.email")}
+									value={field.value}
+									onChange={field.onChange}
+									onBlur={field.onBlur}
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -116,6 +122,7 @@ function ResetForm() {
 							<div className="flex gap-2">
 								<FormControl>
 									<Input
+										allowClear
 										autoComplete="one-time-code"
 										inputMode="numeric"
 										maxLength={6}
@@ -151,8 +158,8 @@ function ResetForm() {
 						<FormItem>
 							<FormLabel>{t("sys.login.newPassword")}</FormLabel>
 							<FormControl>
-								<Input
-									type="password"
+								<Input.Password
+									allowClear
 									autoComplete="new-password"
 									placeholder={t("sys.login.newPassword")}
 									{...field}
@@ -174,8 +181,8 @@ function ResetForm() {
 						<FormItem>
 							<FormLabel>{t("sys.login.confirmPassword")}</FormLabel>
 							<FormControl>
-								<Input
-									type="password"
+								<Input.Password
+									allowClear
 									autoComplete="new-password"
 									placeholder={t("sys.login.confirmPassword")}
 									{...field}

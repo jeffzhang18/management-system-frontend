@@ -1,10 +1,10 @@
+import { Input } from "antd";
 import { Loader2, Mail } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
-import { DB_USER } from "@/_mock/assets_backup";
 import type { SignInReq } from "@/api/services/userService";
 import { Icon } from "@/components/icon";
 import PasskeyLoginButton from "@/components/passkeys/login-button";
@@ -13,8 +13,8 @@ import { useSignIn } from "@/store/userStore";
 import { Button } from "@/ui/button";
 import { Checkbox } from "@/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/ui/form";
-import { Input } from "@/ui/input";
 import { cn } from "@/utils";
+import { EmailInput } from "./email-input";
 import { LoginStateEnum, useLoginStateContext } from "./providers/login-provider";
 
 export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<"form">) {
@@ -65,7 +65,12 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 							<FormItem>
 								<FormLabel>{t("sys.login.email")}</FormLabel>
 								<FormControl>
-									<Input placeholder={DB_USER.map((user) => user.email).join("")} {...field} />
+									<EmailInput
+										placeholder={t("sys.login.email")}
+										value={field.value}
+										onChange={field.onChange}
+										onBlur={field.onBlur}
+									/>
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -80,7 +85,12 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 							<FormItem>
 								<FormLabel>{t("sys.login.password")}</FormLabel>
 								<FormControl>
-									<Input type="password" placeholder={DB_USER[0].password} {...field} suppressHydrationWarning />
+									<Input.Password
+										allowClear
+										placeholder={t("sys.login.password")}
+										{...field}
+										suppressHydrationWarning
+									/>
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -123,19 +133,8 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 						{t("sys.login.emailCodeSignInTitle")}
 					</Button>
 
-					<PasskeyLoginButton />
-
-					{/* 手机登录/二维码登录 */}
-					<div className="grid gap-4 sm:grid-cols-2">
-						<Button
-							type="button"
-							variant="outline"
-							className="w-full"
-							onClick={() => setLoginState(LoginStateEnum.MOBILE)}
-						>
-							<Icon icon="uil:mobile-android" size={20} />
-							{t("sys.login.mobileSignInFormTitle")}
-						</Button>
+					<div className="grid items-start gap-4 sm:grid-cols-2">
+						<PasskeyLoginButton />
 						<Button
 							type="button"
 							variant="outline"
@@ -144,22 +143,6 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
 						>
 							<Icon icon="uil:qrcode-scan" size={20} />
 							{t("sys.login.qrSignInFormTitle")}
-						</Button>
-					</div>
-
-					{/* 其他登录方式 */}
-					<div className="relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t after:border-border">
-						<span className="relative z-10 bg-background px-2 text-muted-foreground">{t("sys.login.otherSignIn")}</span>
-					</div>
-					<div className="flex cursor-pointer justify-around text-2xl">
-						<Button type="button" variant="ghost" size="icon">
-							<Icon icon="mdi:github" size={24} />
-						</Button>
-						<Button type="button" variant="ghost" size="icon">
-							<Icon icon="mdi:wechat" size={24} />
-						</Button>
-						<Button type="button" variant="ghost" size="icon">
-							<Icon icon="ant-design:google-circle-filled" size={24} />
 						</Button>
 					</div>
 

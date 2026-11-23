@@ -51,7 +51,7 @@
 			"title": "Passkeys: face and fingerprint sign in",
 			"description": "Use your face, fingerprint, or device screen lock to sign in. This site stores only your public key and never receives biometric data.",
 			"phoneSetup": "To get started, sign in on your phone and add a passkey here, or choose “Another phone” on your computer to register by scanning a QR code.",
-			"loginButton": "Face / fingerprint on this device",
+			"loginButton": "Face / fingerprint",
 			"localHint": "Use a passkey on this device. The system may also ask for its screen-lock password.",
 			"scanTitle": "Sign in with your phone",
 			"scanButton": "Open phone QR sign in",

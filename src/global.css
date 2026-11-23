@@ -178,3 +178,29 @@
     font-size: 16px !important;
   }
 }
+
+/* Keep browser autofill from painting a blue background on antd inputs. */
+.ant-input:-webkit-autofill,
+.ant-input:-webkit-autofill:hover,
+.ant-input:-webkit-autofill:focus,
+.ant-input-affix-wrapper input:-webkit-autofill,
+.ant-select-selection-search-input:-webkit-autofill {
+  transition: background-color 600000s 0s, color 600000s 0s;
+}
+
+/* Password input: eye on the left, clear icon on the far right (matches email input). */
+.ant-input-password .ant-input-suffix {
+  flex-direction: row-reverse;
+}
+.ant-input-password .ant-input-suffix .ant-input-clear-icon {
+  margin-inline: 8px 0 !important;
+}
+
+/* Input clear icon: only visible while hovering the input. */
+.ant-input-affix-wrapper .ant-input-clear-icon {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.ant-input-affix-wrapper:hover .ant-input-clear-icon {
+  opacity: 1;
+}
