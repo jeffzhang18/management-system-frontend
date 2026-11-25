@@ -3,7 +3,8 @@ import { toast } from "sonner";
 import type { Result } from "#/api";
 import { ResultStatus } from "#/enum";
 import { GLOBAL_CONFIG } from "@/global-config";
-import { t } from "@/locales/i18n";
+import i18n, { t } from "@/locales/i18n";
+import { htmlLanguage, normalizeLocale } from "@/locales/locale";
 import userStore from "@/store/userStore";
 
 const REFRESH_URL = "/auth/refresh-token";
@@ -117,6 +118,9 @@ axiosInstance.interceptors.request.use(
 	(config) => {
 		const { userToken } = userStore.getState();
 		const headers = AxiosHeaders.from((config.headers || {}) as any);
+
+		const locale = normalizeLocale(i18n.resolvedLanguage || i18n.language) || "en_US";
+		headers.set("Accept-Language", htmlLanguage(locale));
 
 		if (userToken.accessToken) {
 			headers.set("Authorization", `Bearer ${userToken.accessToken}`);
